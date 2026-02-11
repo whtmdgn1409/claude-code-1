@@ -15,6 +15,9 @@ from app.models.analytics import PriceHistory, DealStatistics, DealKeyword
 from app.models.crawler import CrawlerRun, CrawlerError, CrawlerState
 from app.models.blacklist import Blacklist
 
+# Import API routers
+from app.api.deals import router as deals_router
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -33,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API routers
+app.include_router(deals_router)
 
 
 @app.on_event("startup")
