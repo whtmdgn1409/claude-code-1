@@ -18,6 +18,7 @@ from app.models.blacklist import Blacklist
 # Import API routers
 from app.api.deals import router as deals_router
 from app.api.users import router as users_router
+from app.api.keywords import router as keywords_router
 
 
 # Create FastAPI application
@@ -41,6 +42,7 @@ app.add_middleware(
 # Register API routers
 app.include_router(deals_router)
 app.include_router(users_router)
+app.include_router(keywords_router)
 
 
 @app.on_event("startup")

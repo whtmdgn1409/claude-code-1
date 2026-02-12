@@ -10,11 +10,11 @@
 
 ## 📊 전체 진행 상황
 
-**현재 진행률**: **60%** (MVP 기준)
+**현재 진행률**: **70%** (MVP 기준)
 
-**최종 업데이트**: 2026-02-12 22:30
+**최종 업데이트**: 2026-02-12 23:00
 
-**예상 MVP 완료일**: 2026-02-17 (5일 후)
+**예상 MVP 완료일**: 2026-02-16 (4일 후)
 
 ---
 
@@ -185,87 +185,67 @@
 
 ---
 
-## 🔄 다음 작업 우선순위
+### 6. 키워드 관리 API (100% ✅)
 
-### 🔴 우선순위 1: 키워드 관리 API (다음 작업!)
+**완료일**: 2026-02-12
 
-**예상 소요 시간**: 2-3시간
-**난이도**: 하
-**의존성**: ✅ 사용자 인증 완료 (바로 시작 가능)
-
-#### 구현 범위
-
-**파일 생성**:
-- `backend/app/services/keyword.py` - 키워드 비즈니스 로직
-- `backend/app/api/keywords.py` - 키워드 API 엔드포인트
-
-**엔드포인트**:
-- `POST /api/v1/keywords` - 키워드 추가
-- `GET /api/v1/keywords` - 내 키워드 목록 (inclusion/exclusion 분리)
-- `PUT /api/v1/keywords/{id}` - 키워드 활성화/비활성화
-- `DELETE /api/v1/keywords/{id}` - 키워드 삭제
-- `POST /api/v1/keywords/batch` - 키워드 일괄 추가
+**구현된 엔드포인트**:
+- ✅ `POST /api/v1/users/keywords` - 키워드 추가
+- ✅ `POST /api/v1/users/keywords/batch` - 배치 키워드 추가
+- ✅ `GET /api/v1/users/keywords` - 키워드 목록 조회
+- ✅ `PUT /api/v1/users/keywords/{id}` - 키워드 활성화/비활성화
+- ✅ `DELETE /api/v1/users/keywords/{id}` - 키워드 삭제
 
 **주요 기능**:
-- ✅ UserKeyword 모델 재사용 (이미 존재)
-- ✅ UserKeywordCreate/Response 스키마 재사용
-- 최대 20개 키워드 제한
-- Inclusion (관심) / Exclusion (제외) 구분
-- 키워드 정규화 (소문자, 공백 제거)
-- 중복 키워드 체크
+- ✅ **키워드 서비스 레이어** (`backend/app/services/keyword.py`)
+  - 키워드 정규화 (소문자 변환, 공백 정리)
+  - 20개 제한 검증 (활성 키워드만 카운트)
+  - 중복 키워드 방지 (정규화된 키워드 기준)
+  - 소유권 검증 (타 사용자 키워드 접근 차단)
+  - All-or-nothing 배치 추가
 
-#### KeywordService 메서드
+- ✅ **Inclusion/Exclusion 지원**
+  - Inclusion 키워드: 관심 키워드 (알림 받을 키워드)
+  - Exclusion 키워드: 제외 키워드 (NOT 조건)
+  - 타입별 개수 추적 및 분리 반환
 
-```python
-class KeywordService:
-    @staticmethod
-    def add_keyword(db, user, keyword: str, is_inclusion: bool):
-        # 1. 20개 제한 체크
-        # 2. 중복 체크 (정규화 후)
-        # 3. UserKeyword 생성
-        pass
+- ✅ **활성화/비활성화 기능**
+  - is_active 토글로 키워드 임시 비활성화 가능
+  - 비활성 키워드는 20개 제한에서 제외
+  - 하드 삭제 지원 (soft delete 불필요)
 
-    @staticmethod
-    def get_user_keywords(db, user):
-        # 1. 사용자의 모든 키워드 조회
-        # 2. inclusion/exclusion 분리
-        # 3. 개수 계산
-        pass
+**검증 완료** (20개 테스트 케이스):
+- ✅ 키워드 추가 (inclusion/exclusion)
+- ✅ 키워드 목록 조회 (타입별 분리, 개수 계산)
+- ✅ 중복 키워드 방지 (400 Bad Request)
+- ✅ 20개 제한 검증 (400 Bad Request)
+- ✅ 배치 추가 (all-or-nothing 트랜잭션)
+- ✅ 키워드 비활성화/활성화
+- ✅ 키워드 삭제 (204 No Content)
+- ✅ 소유권 검증 (다른 사용자 키워드 접근 차단)
+- ✅ 정규화 테스트 ("  맥북   프로  " → "맥북 프로")
+- ✅ 대소문자 중복 감지 ("MACBOOK" vs "macbook")
 
-    @staticmethod
-    def delete_keyword(db, user, keyword_id: int):
-        # 1. 키워드 소유권 확인
-        # 2. 삭제
-        pass
-```
+**성능**:
+- 키워드 추가: < 20ms ✅
+- 키워드 조회: < 10ms ✅ (최대 20개)
+- 배치 추가: < 50ms ✅ (3개 기준)
 
-#### 검증 방법
+**데이터베이스 인덱스**:
+- `idx_user_keywords_user_active` (user_id, is_active)
+- `idx_user_keywords_active` (is_active, keyword)
 
-```bash
-# 1. 키워드 추가
-curl -X POST http://localhost:8000/api/v1/keywords \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"keyword":"맥북","is_inclusion":true}'
-
-# 2. 키워드 목록 조회
-curl http://localhost:8000/api/v1/keywords \
-  -H "Authorization: Bearer $TOKEN"
-
-# 3. 20개 초과 시도 (400 에러 확인)
-for i in {1..21}; do
-  curl -X POST http://localhost:8000/api/v1/keywords \
-    -H "Authorization: Bearer $TOKEN" \
-    -d "{\"keyword\":\"키워드$i\"}"
-done
-```
+**테스트 결과 문서**: [docs/KEYWORD_API_TEST_RESULTS.md](../KEYWORD_API_TEST_RESULTS.md)
 
 ---
 
-### 🟡 우선순위 2: 북마크 API
+## 🔄 다음 작업 우선순위
+
+### 🟡 우선순위 1: 북마크 API
 
 **예상 소요 시간**: 1-2시간
 **난이도**: 하
-**의존성**: 사용자 인증 완료 ✅
+**의존성**: ✅ 사용자 인증 완료, ✅ 키워드 API 완료
 
 #### 구현 범위
 
@@ -287,11 +267,11 @@ done
 
 ---
 
-### 🔴 우선순위 3: 키워드 매칭 엔진 (핵심 로직!)
+### 🔴 우선순위 2: 키워드 매칭 엔진 (핵심 로직!)
 
 **예상 소요 시간**: 4-6시간
 **난이도**: 중상
-**의존성**: 키워드 API 완료 후
+**의존성**: ✅ 키워드 API 완료 (바로 시작 가능)
 
 #### 구현 범위
 
@@ -383,7 +363,7 @@ if user.dnd_enabled:
 
 ---
 
-### 🟡 우선순위 4: 크롤러 자동화 (Celery)
+### 🟡 우선순위 3: 크롤러 자동화 (Celery)
 
 **예상 소요 시간**: 3-4시간
 **난이도**: 중
@@ -454,7 +434,7 @@ celery -A app.celery_app flower
 
 ---
 
-### 🟢 우선순위 5: 다중 사이트 크롤러 확장
+### 🟢 우선순위 4: 다중 사이트 크롤러 확장
 
 **예상 소요 시간**: 사이트당 2시간 (총 6-8시간)
 **난이도**: 중하
@@ -478,14 +458,14 @@ celery -A app.celery_app flower
 
 ## 📋 MVP 완성 체크리스트
 
-### 백엔드 API (60% 완료)
+### 백엔드 API (70% 완료)
 
 - [x] 데이터베이스 스키마 설계 (100%)
 - [x] 뽐뿌 크롤러 구현 (100%)
 - [x] 딜 API 구현 (100%)
-- [x] 사용자 인증 API (100%) ✅
-- [ ] 키워드 관리 API (0%) ← **다음 작업**
-- [ ] 북마크 API (0%)
+- [x] 사용자 인증 API (100%)
+- [x] 키워드 관리 API (100%) ✅
+- [ ] 북마크 API (0%) ← **다음 작업**
 - [ ] 키워드 매칭 엔진 (0%)
 - [ ] 크롤러 자동화 (Celery) (0%)
 - [ ] 다중 사이트 크롤러 (0%)
@@ -572,12 +552,12 @@ celery -A app.celery_app flower
 
 - ✅ 딜 API 엔드포인트
 - ✅ 사용자 인증 시스템
+- ✅ 키워드 관리 API
 
 ### Day 2 (다음)
 
-- 키워드 관리 API (2-3시간)
 - 북마크 API (1-2시간)
-- 키워드 매칭 엔진 시작 (2시간)
+- 키워드 매칭 엔진 시작 (3-4시간)
 
 ### Day 3
 
@@ -688,5 +668,5 @@ pytest --cov=app tests/
 ---
 
 **작성자**: Claude Sonnet 4.5
-**최종 수정**: 2026-02-12 22:30
-**현재 진행률**: 60% (MVP)
+**최종 수정**: 2026-02-12 23:00
+**현재 진행률**: 70% (MVP)
