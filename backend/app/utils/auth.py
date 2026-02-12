@@ -4,7 +4,7 @@ Handles password hashing, token generation/verification, and current user depend
 """
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 import bcrypt
@@ -153,3 +153,48 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_user_optional(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    FastAPI dependency to optionally get the current authenticated user.
+    Returns None if no valid token is provided instead of raising an error.
+
+    Args:
+        request: FastAPI Request object
+        db: Database session
+
+    Returns:
+        Current authenticated User object or None
+    """
+    # Extract token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header.replace("Bearer ", "")
+
+    try:
+        # Verify token and extract user_id
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id_str: str = payload.get("sub")
+
+        if user_id_str is None:
+            return None
+
+        user_id = int(user_id_str)
+
+        # Query user from database
+        user = db.query(User).filter(
+            User.id == user_id,
+            User.is_active == True,
+            User.deleted_at == None
+        ).first()
+
+        return user
+
+    except (JWTError, ValueError, TypeError):
+        return None

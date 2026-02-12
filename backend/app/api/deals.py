@@ -10,6 +10,7 @@ from math import ceil
 
 from app.models.database import get_db
 from app.models.deal import Deal, DealSource, Category
+from app.models.user import User
 from app.schemas.deal import (
     DealResponse,
     DealListResponse,
@@ -17,6 +18,8 @@ from app.schemas.deal import (
     DealSourceResponse,
     CategoryResponse
 )
+from app.services.bookmark import BookmarkService
+from app.utils.auth import get_current_user_optional
 
 router = APIRouter(prefix="/api/v1", tags=["deals"])
 
@@ -161,12 +164,14 @@ async def search_deals(
 @router.get("/deals/{deal_id}", response_model=DealDetailResponse)
 async def get_deal(
     deal_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get detailed information about a specific deal.
 
     - **deal_id**: The ID of the deal to retrieve
+    - If authenticated, includes bookmark status
     """
     deal = db.query(Deal).options(
         joinedload(Deal.source),
@@ -196,6 +201,16 @@ async def get_deal(
     # Convert to response model
     response = DealDetailResponse.model_validate(deal)
     response.price_history = price_history
+
+    # Check bookmark status if user is authenticated
+    if current_user:
+        response.is_bookmarked = BookmarkService.check_is_bookmarked(
+            db=db,
+            user_id=current_user.id,
+            deal_id=deal_id
+        )
+    else:
+        response.is_bookmarked = False
 
     return response
 

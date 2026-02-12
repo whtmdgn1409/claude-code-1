@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     CRAWLER_REQUEST_DELAY: float = 1.0  # seconds between requests
     CRAWLER_MAX_RETRIES: int = 3
 
+    # Celery settings
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+    CELERY_TIMEZONE: str = "Asia/Seoul"
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_RESULT_SERIALIZER: str = "json"
+    CELERY_ACCEPT_CONTENT: list = ["json"]
+    CELERY_TASK_TRACK_STARTED: bool = True
+    CELERY_TASK_TIME_LIMIT: int = 30 * 60  # 30 minutes
+
     class Config:
         env_file = ".env"
         case_sensitive = True
