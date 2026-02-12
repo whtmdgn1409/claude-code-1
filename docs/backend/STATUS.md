@@ -1,114 +1,232 @@
-# 딜모아 개발 진행 상황 및 다음 단계
+# 개발 현황 - DealMoa Backend
 
-**작성일**: 2026-02-12
-**현재 진행률**: 60% (MVP 기준)
-**최종 업데이트**: 2026-02-12 22:30
+**연관 문서**:
+- [프로젝트 개요](../PROJECT.md)
+- [데이터베이스](DATABASE.md)
+- [크롤러 가이드](CRAWLERS.md)
+- [API 명세](API.md)
 
 ---
 
-## ✅ 오늘 완료한 작업 (2026-02-12)
+## 📊 전체 진행 상황
 
-### 1. 딜 API 엔드포인트 구현 ✅ (100% 완료)
-- 5개 엔드포인트 구현 및 테스트 완료
-- 한글 검색 기능 정상 동작
-- 성능 목표 달성 (< 50ms ~ 200ms)
-- Swagger UI 문서 자동 생성
+**현재 진행률**: **60%** (MVP 기준)
 
-### 2. **사용자 인증 시스템 구현** ✅ (100% 완료) 🎉
-**소요 시간**: 약 3시간 (디버깅 포함)
+**최종 업데이트**: 2026-02-12 22:30
 
-#### 구현된 기능
+**예상 MVP 완료일**: 2026-02-17 (5일 후)
+
+---
+
+## ✅ 완료된 작업
+
+### 1. 데이터베이스 스키마 (100% ✅)
+
+**완료일**: 2026-02-11
+
+**구현 내용**:
+- ✅ **15개 테이블** 설계 및 생성
+  - 핵심 인프라: deal_sources, categories, blacklist
+  - 사용자 관리: users, user_keywords, user_devices
+  - 딜 관리: deals, deal_keywords, price_history, deal_statistics
+  - 상호작용: bookmarks, notifications
+  - 크롤러: crawler_runs, crawler_errors, crawler_state
+
+- ✅ **27개 이상 인덱스** 최적화
+  - pg_trgm 한국어 검색 인덱스
+  - 피드 쿼리 복합 인덱스
+  - 키워드 매칭 고속 인덱스
+
+- ✅ **15개 자동 업데이트 트리거**
+  - updated_at 자동 갱신
+
+- ✅ **시드 데이터**
+  - 5개 딜 소스 (뽐뿌, 루리웹, 펨코, 퀘이사존, 딜바다)
+  - 15개 카테고리
+  - 4개 블랙리스트 패턴
+
+**기술 스택**:
+- PostgreSQL 15 + pg_trgm
+- SQLAlchemy 2.0.46
+- Alembic 1.13.1
+
+**관련 문서**: [DATABASE.md](DATABASE.md)
+
+---
+
+### 2. 뽐뿌 크롤러 (100% ✅)
+
+**완료일**: 2026-02-11
+
+**구현 내용**:
+- ✅ **BaseCrawler 클래스** - 재사용 가능한 기반
+  - 크롤러 실행 추적 (CrawlerRun)
+  - 에러 로깅 (CrawlerError)
+  - 상태 관리 (CrawlerState)
+  - Rate limiting
+  - 자동 통계 수집
+
+- ✅ **PpomppuCrawler** - 뽐뿌 전용
+  - EUC-KR 인코딩 처리
+  - 가격 자동 추출 (원, 만원, 천원)
+  - 쇼핑몰 자동 감지
+  - 추천수/비추천수 파싱
+  - 다중 페이지 크롤링
+
+- ✅ **KeywordExtractor** - 키워드 자동 추출
+  - 한글/영문 단어 추출
+  - 모델명/제품번호 감지
+  - 불용어 필터링
+  - 최대 50개 키워드/딜
+
+**실행 결과**:
+- 페이지: 2페이지 크롤링
+- 수집: 41개 딜
+- 키워드: 259개 (평균 6.3개/딜)
+- 성공률: 100% (에러 0건)
+
+**관련 문서**: [CRAWLERS.md](CRAWLERS.md)
+
+---
+
+### 3. FastAPI 기본 구조 (100% ✅)
+
+**완료일**: 2026-02-10
+
+**구현 내용**:
+- ✅ FastAPI 애플리케이션 설정
+- ✅ CORS 미들웨어
+- ✅ 데이터베이스 연결 health check
+- ✅ Swagger UI 문서 (`/docs`)
+- ✅ 환경 변수 관리 (`.env`)
+
+**엔드포인트**:
+- `GET /` - API 정보
+- `GET /health` - 헬스 체크 (DB 연결 확인)
+- `GET /docs` - Swagger UI
+
+---
+
+### 4. 딜 API (100% ✅)
+
+**완료일**: 2026-02-12
+
+**구현된 엔드포인트**:
+- ✅ `GET /api/v1/deals` - 딜 목록 (페이징, 필터링, 정렬)
+- ✅ `GET /api/v1/deals/{id}` - 딜 상세 조회 (가격 히스토리 포함)
+- ✅ `GET /api/v1/deals/search` - 키워드 검색 (한글 완벽 지원)
+- ✅ `GET /api/v1/sources` - 딜 소스 목록
+- ✅ `GET /api/v1/categories` - 카테고리 목록
+
+**주요 기능**:
+- ✅ 페이징 (page, page_size)
+- ✅ 필터링 (source_id, category_id)
+- ✅ 정렬 (hot_score, published_at, price, bookmark_count)
+- ✅ 한국어 검색 (LIKE 기반)
+- ✅ 관계 데이터 자동 조인 (source, category)
+- ✅ 가격 히스토리 포함 (상세 조회 시)
+
+**성능**:
+- 딜 목록 조회: < 50ms ✅ (실제: 40ms)
+- 딜 상세 조회: < 50ms ✅ (실제: 45ms)
+- 검색: < 200ms ✅ (실제: 180ms)
+
+**테스트 결과**:
+- ✅ 딜 목록: 41개 딜 정상 반환
+- ✅ 딜 상세: 가격 히스토리, 관계 데이터 포함
+- ✅ 검색: "머그컵" 키워드로 1건 매칭
+- ✅ 소스 목록: 5개 소스 반환
+- ✅ 카테고리: 15개 카테고리 반환
+
+**관련 문서**: [API.md](API.md)
+
+---
+
+### 5. 사용자 인증 API (100% ✅)
+
+**완료일**: 2026-02-12
+
+**구현된 엔드포인트**:
+- ✅ `POST /api/v1/users/register` - 회원가입
+- ✅ `POST /api/v1/users/login` - 로그인
+- ✅ `GET /api/v1/users/me` - 내 정보 조회
+- ✅ `PUT /api/v1/users/me` - 프로필 수정
+- ✅ `PUT /api/v1/users/me/settings` - 알림 설정
+- ✅ `DELETE /api/v1/users/me` - 회원 탈퇴
+
+**주요 기능**:
 - ✅ **JWT 인증 유틸리티** (`backend/app/utils/auth.py`)
   - bcrypt 비밀번호 해싱/검증
   - JWT 토큰 생성/검증 (HS256, 7일 만료)
   - `get_current_user()` FastAPI Dependency
-  - JWT "sub" claim 문자열 변환 처리
 
 - ✅ **사용자 서비스 레이어** (`backend/app/services/user.py`)
   - 이메일 중복 체크 기반 회원가입
-  - 이메일/비밀번호 인증 (last_login_at 자동 업데이트)
-  - 프로필 수정 (username, display_name, age, gender)
-  - 알림 설정 수정 (push_enabled, DND 시간)
-  - 소프트 삭제 (is_active=False, deleted_at 기록)
+  - 이메일/비밀번호 인증
+  - 프로필 수정
+  - 알림 설정 수정 (push_enabled, DND)
+  - 소프트 삭제
 
-- ✅ **사용자 API 엔드포인트** (`backend/app/api/users.py`)
-  - `POST /api/v1/users/register` - 회원가입 (201 Created)
-  - `POST /api/v1/users/login` - 로그인 (200 OK)
-  - `GET /api/v1/users/me` - 내 정보 조회
-  - `PUT /api/v1/users/me` - 프로필 수정
-  - `PUT /api/v1/users/me/settings` - 알림 설정
-  - `DELETE /api/v1/users/me` - 회원 탈퇴 (204 No Content)
+**검증 완료**:
+- ✅ 회원가입 성공 (JWT 토큰 반환)
+- ✅ 로그인 성공 (last_login_at 업데이트)
+- ✅ 인증된 요청 (Bearer 토큰)
+- ✅ 프로필 수정
+- ✅ 알림 설정
+- ✅ 회원 탈퇴 (소프트 삭제, 토큰 무효화)
+- ✅ 에러 처리 (잘못된 비밀번호: 401, 무효 토큰: 401)
 
-#### 검증 완료
-```bash
-✅ 회원가입 성공 (JWT 토큰 반환)
-✅ 로그인 성공 (last_login_at 업데이트)
-✅ 인증된 요청 (Bearer 토큰)
-✅ 프로필 수정 (display_name: "Updated Name", age: 30)
-✅ 알림 설정 (dnd_enabled: false)
-✅ 회원 탈퇴 (소프트 삭제, 토큰 무효화)
-✅ 에러 처리 (잘못된 비밀번호: 401, 무효 토큰: 401)
-```
+**해결한 이슈**:
+1. ✅ bcrypt 버전 호환성 문제
+2. ✅ PostgreSQL enum 'EMAIL' 추가
+3. ✅ JWT "sub" claim 타입 오류
 
-#### 데이터베이스 확인
-```sql
- id |        email        | auth_provider | is_active | deleted_at
-----+---------------------+---------------+-----------+------------
-  1 | test@dealmoa.com    | EMAIL         | f         | 2026-02-12
-  2 | newuser@dealmoa.com | EMAIL         | t         | NULL
-
-✅ 비밀번호 bcrypt 해싱 확인 ($2b$12$...)
-✅ 소프트 삭제 작동 확인
-```
-
-#### 해결한 이슈
-1. ✅ bcrypt 버전 호환성 문제 → bcrypt 직접 사용으로 해결
-2. ✅ PostgreSQL enum 'EMAIL' 추가 → ALTER TYPE 실행
-3. ✅ JWT "sub" claim 타입 오류 → str(user.id) 변환
+**관련 문서**: [API.md](API.md)
 
 ---
 
-## 🎯 다음 작업 우선순위
+## 🔄 다음 작업 우선순위
 
 ### 🔴 우선순위 1: 키워드 관리 API (다음 작업!)
+
 **예상 소요 시간**: 2-3시간
 **난이도**: 하
 **의존성**: ✅ 사용자 인증 완료 (바로 시작 가능)
 
 #### 구현 범위
+
 **파일 생성**:
 - `backend/app/services/keyword.py` - 키워드 비즈니스 로직
 - `backend/app/api/keywords.py` - 키워드 API 엔드포인트
 
 **엔드포인트**:
-```
-POST   /api/v1/keywords              # 키워드 추가
-GET    /api/v1/keywords              # 내 키워드 목록 (inclusion/exclusion 분리)
-PUT    /api/v1/keywords/{id}         # 키워드 활성화/비활성화
-DELETE /api/v1/keywords/{id}         # 키워드 삭제
-POST   /api/v1/keywords/batch        # 키워드 일괄 추가 (최대 20개)
-```
+- `POST /api/v1/keywords` - 키워드 추가
+- `GET /api/v1/keywords` - 내 키워드 목록 (inclusion/exclusion 분리)
+- `PUT /api/v1/keywords/{id}` - 키워드 활성화/비활성화
+- `DELETE /api/v1/keywords/{id}` - 키워드 삭제
+- `POST /api/v1/keywords/batch` - 키워드 일괄 추가
 
 **주요 기능**:
 - ✅ UserKeyword 모델 재사용 (이미 존재)
 - ✅ UserKeywordCreate/Response 스키마 재사용
-- 최대 20개 키워드 제한 (DB 쿼리로 체크)
-- Inclusion (관심) / Exclusion (제외) 키워드 구분
-- 키워드 정규화 (소문자 변환, 공백 제거)
-- 중복 키워드 체크 (대소문자 무시)
+- 최대 20개 키워드 제한
+- Inclusion (관심) / Exclusion (제외) 구분
+- 키워드 정규화 (소문자, 공백 제거)
+- 중복 키워드 체크
 
-**KeywordService 메서드**:
+#### KeywordService 메서드
+
 ```python
 class KeywordService:
     @staticmethod
-    def add_keyword(db, user, keyword: str, is_inclusion: bool) -> UserKeyword:
+    def add_keyword(db, user, keyword: str, is_inclusion: bool):
         # 1. 20개 제한 체크
         # 2. 중복 체크 (정규화 후)
         # 3. UserKeyword 생성
         pass
 
     @staticmethod
-    def get_user_keywords(db, user) -> UserKeywordListResponse:
+    def get_user_keywords(db, user):
         # 1. 사용자의 모든 키워드 조회
         # 2. inclusion/exclusion 분리
         # 3. 개수 계산
@@ -121,7 +239,8 @@ class KeywordService:
         pass
 ```
 
-**검증 방법**:
+#### 검증 방법
+
 ```bash
 # 1. 키워드 추가
 curl -X POST http://localhost:8000/api/v1/keywords \
@@ -143,71 +262,45 @@ done
 ---
 
 ### 🟡 우선순위 2: 북마크 API
+
 **예상 소요 시간**: 1-2시간
 **난이도**: 하
 **의존성**: 사용자 인증 완료 ✅
 
 #### 구현 범위
+
 **파일 생성**:
 - `backend/app/services/bookmark.py` - 북마크 비즈니스 로직
 - `backend/app/api/bookmarks.py` - 북마크 API 엔드포인트
 
 **엔드포인트**:
-```
-POST   /api/v1/bookmarks        # 북마크 추가 (deal_id)
-GET    /api/v1/bookmarks        # 내 북마크 목록 (페이징)
-DELETE /api/v1/bookmarks/{id}   # 북마크 삭제
-GET    /api/v1/deals/{id}       # 딜 상세 (is_bookmarked 필드 추가)
-```
+- `POST /api/v1/bookmarks` - 북마크 추가
+- `GET /api/v1/bookmarks` - 내 북마크 목록 (페이징)
+- `DELETE /api/v1/bookmarks/{id}` - 북마크 삭제
+- `GET /api/v1/deals/{id}` - 딜 상세에 `is_bookmarked` 필드 추가
 
 **주요 기능**:
 - ✅ Bookmark 모델 재사용 (이미 존재)
-- 중복 북마크 방지 (unique constraint 활용)
+- 중복 북마크 방지 (unique constraint)
 - 북마크 생성 시간 기록
-- 딜이 삭제되면 북마크도 자동 삭제 (CASCADE)
-
-**BookmarkService 메서드**:
-```python
-class BookmarkService:
-    @staticmethod
-    def add_bookmark(db, user, deal_id: int) -> Bookmark:
-        # 1. 딜 존재 여부 확인
-        # 2. 중복 체크
-        # 3. Bookmark 생성
-        pass
-
-    @staticmethod
-    def get_user_bookmarks(db, user, page: int, limit: int) -> PaginatedResponse:
-        # 1. 북마크 목록 조회 (최신순)
-        # 2. 딜 정보 join
-        # 3. 페이징
-        pass
-
-    @staticmethod
-    def remove_bookmark(db, user, bookmark_id: int):
-        # 1. 소유권 확인
-        # 2. 삭제
-        pass
-
-    @staticmethod
-    def is_bookmarked(db, user, deal_id: int) -> bool:
-        # 북마크 여부 확인
-        pass
-```
+- 딜 삭제 시 북마크 자동 삭제 (CASCADE)
 
 ---
 
 ### 🔴 우선순위 3: 키워드 매칭 엔진 (핵심 로직!)
+
 **예상 소요 시간**: 4-6시간
 **난이도**: 중상
 **의존성**: 키워드 API 완료 후
 
 #### 구현 범위
+
 **파일 생성**:
 - `backend/app/services/matcher.py` - 키워드 매칭 로직
 - `backend/app/tasks/notification.py` - 알림 처리 태스크
 
-**핵심 메서드**:
+#### 핵심 메서드
+
 ```python
 class KeywordMatcher:
     @staticmethod
@@ -243,7 +336,8 @@ class KeywordMatcher:
         pass
 ```
 
-**매칭 알고리즘**:
+#### 매칭 알고리즘
+
 ```python
 # Include 매칭 (OR 조건)
 user_keywords = ["맥북", "아이패드"]
@@ -263,7 +357,8 @@ matched = (
 )
 ```
 
-**DND 시간 처리**:
+#### DND 시간 처리
+
 ```python
 if user.dnd_enabled:
     now = datetime.now().time()
@@ -275,7 +370,8 @@ if user.dnd_enabled:
         )
 ```
 
-**테스트 시나리오**:
+#### 테스트 시나리오
+
 ```python
 # 사용자 A: ["맥북", "아이패드"] inclusion, ["중고"] exclusion
 # 사용자 B: ["갤럭시"] inclusion, [] exclusion
@@ -288,16 +384,19 @@ if user.dnd_enabled:
 ---
 
 ### 🟡 우선순위 4: 크롤러 자동화 (Celery)
+
 **예상 소요 시간**: 3-4시간
 **난이도**: 중
 **의존성**: 키워드 매칭 엔진 완료 후
 
 #### 구현 범위
+
 **파일 생성**:
 - `backend/app/celery_app.py` - Celery 앱 초기화
 - `backend/app/tasks/crawler.py` - 크롤링 태스크
 
-**Celery Beat 스케줄**:
+#### Celery Beat 스케줄
+
 ```python
 CELERY_BEAT_SCHEDULE = {
     'crawl-ppomppu-every-5-minutes': {
@@ -311,7 +410,8 @@ CELERY_BEAT_SCHEDULE = {
 }
 ```
 
-**크롤러 태스크**:
+#### 크롤러 태스크
+
 ```python
 @celery_app.task(bind=True, max_retries=3)
 def run_ppomppu_crawler(self):
@@ -320,7 +420,7 @@ def run_ppomppu_crawler(self):
         deals = crawler.crawl_list()
 
         for deal_data in deals:
-            # 중복 체크 (external_id)
+            # 중복 체크
             if not Deal.exists(external_id=deal_data['external_id']):
                 deal = Deal.create(deal_data)
 
@@ -334,12 +434,12 @@ def run_ppomppu_crawler(self):
                     NotificationTask.send_push(user, deal)
 
     except Exception as exc:
-        # 에러 로깅
         CrawlerError.log(source='ppomppu', error=str(exc))
         raise self.retry(exc=exc, countdown=60)
 ```
 
-**실행 방법**:
+#### 실행 방법
+
 ```bash
 # Celery Worker 시작
 celery -A app.celery_app worker -l info
@@ -355,11 +455,13 @@ celery -A app.celery_app flower
 ---
 
 ### 🟢 우선순위 5: 다중 사이트 크롤러 확장
+
 **예상 소요 시간**: 사이트당 2시간 (총 6-8시간)
 **난이도**: 중하
 **의존성**: Celery 자동화 완료 후
 
 #### 구현 순서
+
 1. **루리웹** (Ruliweb) - IT/게임 커뮤니티
    - URL: https://bbs.ruliweb.com/market/board/1020
    - 특징: 이미지 풍부, 상세한 딜 정보
@@ -372,33 +474,12 @@ celery -A app.celery_app flower
    - URL: https://www.fmkorea.com/hotdeal
    - 특징: 트래픽 많음, 다양한 카테고리
 
-#### BaseCrawler 추상화
-```python
-class BaseCrawler(ABC):
-    @abstractmethod
-    def fetch_list(self, page: int = 1) -> List[Dict]:
-        """목록 페이지 크롤링"""
-        pass
-
-    @abstractmethod
-    def fetch_detail(self, url: str) -> Dict:
-        """상세 페이지 크롤링"""
-        pass
-
-    def extract_images(self, html: str) -> List[str]:
-        """이미지 URL 추출 (공통)"""
-        pass
-
-    def extract_links(self, text: str) -> List[str]:
-        """상품 링크 추출 (공통)"""
-        pass
-```
-
 ---
 
-## 📊 MVP 완성 체크리스트
+## 📋 MVP 완성 체크리스트
 
 ### 백엔드 API (60% 완료)
+
 - [x] 데이터베이스 스키마 설계 (100%)
 - [x] 뽐뿌 크롤러 구현 (100%)
 - [x] 딜 API 구현 (100%)
@@ -410,6 +491,7 @@ class BaseCrawler(ABC):
 - [ ] 다중 사이트 크롤러 (0%)
 
 ### 프론트엔드 (0% 완료)
+
 - [ ] React Native 프로젝트 초기화
 - [ ] 로그인/회원가입 화면
 - [ ] 딜 목록 화면 (Feed)
@@ -420,6 +502,7 @@ class BaseCrawler(ABC):
 - [ ] 푸시 알림 권한 요청
 
 ### 인프라 (50% 완료)
+
 - [x] Docker Compose 설정
 - [x] PostgreSQL 설정
 - [x] Redis 설정
@@ -432,63 +515,41 @@ class BaseCrawler(ABC):
 ## 🐛 기술 부채 및 개선 사항
 
 ### 🔴 즉시 해결 필요
+
 - [ ] **requirements.txt에 `email-validator` 추가**
   ```bash
   echo "email-validator==2.1.0" >> backend/requirements.txt
   ```
 
 - [ ] **PostgreSQL enum 정리**
-  - 현재: Python enum 값은 "email"이지만 DB에는 "EMAIL"도 추가됨
-  - 문제: 대소문자 불일치로 혼란 가능
+  - 현재: Python enum은 "email", DB에는 "EMAIL"도 존재
+  - 문제: 대소문자 불일치
   - 해결: Alembic 마이그레이션으로 통일
-  ```sql
-  -- 'EMAIL' 제거하고 'email'만 사용
-  ALTER TYPE authprovider DROP VALUE 'EMAIL';
-  ```
 
 - [ ] **Alembic 마이그레이션 설정**
   - 현재: development 모드에서 자동 테이블 생성
   - 문제: 프로덕션 배포 시 스키마 변경 관리 불가
-  - 해결: Alembic 초기화 및 마이그레이션 파일 생성
-  ```bash
-  cd backend
-  alembic init alembic
-  alembic revision --autogenerate -m "Initial schema"
-  ```
+  - 해결: Alembic 초기화
 
 ### 🟡 중요도 중간
+
 - [ ] **환경 변수 검증**
-  - SECRET_KEY가 기본값("your-secret-key-here-change-in-production")이면 경고
-  - 프로덕션 환경에서 필수 환경 변수 체크 (ENVIRONMENT, DATABASE_URL 등)
+  - SECRET_KEY가 기본값이면 경고
+  - 프로덕션 필수 환경 변수 체크
 
 - [ ] **API Rate Limiting**
   - DDoS/Brute-force 공격 방지
   - slowapi 라이브러리 사용
-  ```python
-  from slowapi import Limiter
-  limiter = Limiter(key_func=get_remote_address)
-
-  @app.post("/api/v1/users/login")
-  @limiter.limit("5/minute")
-  def login(...):
-      pass
-  ```
 
 - [ ] **CORS origins 프로덕션 설정**
-  - 현재: `CORS_ORIGINS = ["*"]` (모든 도메인 허용)
-  - 프로덕션: 실제 프론트엔드 도메인만 허용
-  ```python
-  CORS_ORIGINS = [
-      "https://dealmoa.app",
-      "https://www.dealmoa.app"
-  ]
-  ```
+  - 현재: `["*"]` (모든 도메인 허용)
+  - 프로덕션: 실제 도메인만 허용
 
 ### 🟢 추후 개선
+
 - [ ] **Refresh Token 구현**
-  - Access Token: 1시간 (짧게)
+  - Access Token: 1시간
   - Refresh Token: 30일 (Redis 저장)
-  - `/api/v1/users/refresh` 엔드포인트
 
 - [ ] **소셜 로그인**
   - Kakao OAuth 연동
@@ -496,13 +557,11 @@ class BaseCrawler(ABC):
   - Apple Sign In 연동
 
 - [ ] **비밀번호 재설정**
-  - `/api/v1/users/forgot-password` - 이메일 전송
-  - `/api/v1/users/reset-password` - 새 비밀번호 설정
-  - 이메일 발송 서비스 필요 (SendGrid, AWS SES)
+  - 이메일 발송 서비스 (SendGrid, AWS SES)
 
 - [ ] **프로필 이미지 업로드**
   - S3 버킷 연동
-  - 이미지 리사이징 (Pillow)
+  - 이미지 리사이징
   - CDN 연동
 
 ---
@@ -510,23 +569,28 @@ class BaseCrawler(ABC):
 ## 📅 예상 일정
 
 ### Day 1 (✅ 완료)
+
 - ✅ 딜 API 엔드포인트
 - ✅ 사용자 인증 시스템
 
 ### Day 2 (다음)
+
 - 키워드 관리 API (2-3시간)
 - 북마크 API (1-2시간)
 - 키워드 매칭 엔진 시작 (2시간)
 
 ### Day 3
+
 - 키워드 매칭 엔진 완성 (4시간)
 - 크롤러 자동화 시작 (2시간)
 
 ### Day 4
+
 - 크롤러 자동화 완성 (2시간)
 - 다중 사이트 크롤러 (루리웹, 2시간)
 
 ### Day 5
+
 - 다중 사이트 크롤러 (퀘이사존, 펨코, 4시간)
 
 **예상 MVP 완성**: 2026-02-17 (5일 후)
@@ -536,6 +600,7 @@ class BaseCrawler(ABC):
 ## 🚀 빠른 시작
 
 ### 백엔드 서버 실행
+
 ```bash
 # 1. 데이터베이스 시작
 docker-compose up -d
@@ -553,10 +618,12 @@ uvicorn app.main:app --reload
 ```
 
 ### API 문서 확인
+
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
 ### 데이터베이스 접속
+
 ```bash
 # PostgreSQL 직접 접속
 docker exec -it claude-code-1-postgres-1 psql -U postgres -d dealmoa
@@ -569,6 +636,7 @@ SELECT id, user_id, keyword, is_inclusion FROM user_keywords;
 ```
 
 ### 테스트 실행
+
 ```bash
 cd backend
 pytest tests/ -v
@@ -579,14 +647,46 @@ pytest --cov=app tests/
 
 ---
 
+## 📊 기술 스택 현황
+
+### Backend (구축 완료 ✅)
+
+- ✅ Python 3.13
+- ✅ FastAPI 0.109.0
+- ✅ SQLAlchemy 2.0.46
+- ✅ PostgreSQL 15
+- ✅ Redis 7
+- ✅ BeautifulSoup4 (크롤링)
+- ⏳ Celery (예정)
+- ⏳ Firebase Admin SDK (예정)
+
+### Mobile (미구현 ⏳)
+
+- ⏳ React Native
+- ⏳ TypeScript
+- ⏳ React Navigation
+- ⏳ Axios
+- ⏳ React Native Push Notification
+
+### DevOps (부분 구현 🔄)
+
+- ✅ Docker Compose (PostgreSQL, Redis)
+- ⏳ Docker (백엔드 컨테이너화)
+- ⏳ GitHub Actions (CI/CD)
+- ⏳ AWS/GCP (배포)
+
+---
+
 ## 📚 참고 문서
 
 - **CLAUDE.md**: 프로젝트 개요 및 기술 스택
-- **DATABASE_SCHEMA_IMPLEMENTATION_SUMMARY.md**: DB 스키마 상세
-- **CRAWLER_README.md**: 크롤러 사용법
-- **DEAL_API_IMPLEMENTATION_SUMMARY.md**: 딜 API 구현 세부사항
+- **[DATABASE.md](DATABASE.md)**: DB 스키마 상세
+- **[CRAWLERS.md](CRAWLERS.md)**: 크롤러 사용법
+- **[API.md](API.md)**: API 명세서
+- **[PROJECT.md](../PROJECT.md)**: 프로젝트 전체 개요
 
 ---
 
 **작성자**: Claude Sonnet 4.5
 **최종 수정**: 2026-02-12 22:30
+**현재 진행률**: 60% (MVP)
