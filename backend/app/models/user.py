@@ -16,6 +16,7 @@ from app.models.base import TimestampMixin, SoftDeleteMixin
 
 class AuthProvider(str, enum.Enum):
     """Supported authentication providers."""
+    EMAIL = "email"
     KAKAO = "kakao"
     GOOGLE = "google"
     APPLE = "apple"

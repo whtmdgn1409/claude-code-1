@@ -38,10 +38,6 @@ class UserUpdate(BaseModel):
     avatar_url: Optional[str] = None
     age: Optional[int] = Field(None, ge=1, le=150)
     gender: Optional[Gender] = None
-    push_enabled: Optional[bool] = None
-    dnd_enabled: Optional[bool] = None
-    dnd_start_time: Optional[time] = None
-    dnd_end_time: Optional[time] = None
 
 
 class UserResponse(UserBase):
@@ -58,6 +54,36 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+
+class UserRegisterRequest(BaseModel):
+    """Schema for email/password registration."""
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+
+
+class UserLoginRequest(BaseModel):
+    """Schema for email/password login."""
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    """Schema for JWT token response."""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds
+    user: UserResponse
+
+
+class UserSettingsUpdate(BaseModel):
+    """Schema for updating notification settings only."""
+    push_enabled: Optional[bool] = None
+    dnd_enabled: Optional[bool] = None
+    dnd_start_time: Optional[time] = None
+    dnd_end_time: Optional[time] = None
 
 
 # ============================================================================
