@@ -58,6 +58,8 @@ class NotificationResponse(BaseModel):
     body: str
     matched_keywords: Optional[List[str]] = None
     status: NotificationStatus
+    scheduled_for: Optional[datetime] = None
+    read_at: Optional[datetime] = None
     sent_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     clicked_at: Optional[datetime] = None
@@ -76,6 +78,48 @@ class NotificationListResponse(BaseModel):
     unread_count: int
 
 
+class NotificationUnreadCountResponse(BaseModel):
+    """Schema for unread notification count."""
+    unread_count: int
+
+
 class NotificationMarkReadRequest(BaseModel):
     """Schema for marking notifications as read/clicked."""
     notification_ids: List[int]
+
+
+# ============================================================================
+# Device Schemas
+# ============================================================================
+
+class DeviceRegisterRequest(BaseModel):
+    """Schema for registering a device for push notifications."""
+    device_type: str  # 'ios' or 'android'
+    device_token: str
+    device_name: Optional[str] = None
+
+
+class DeviceUnregisterRequest(BaseModel):
+    """Schema for unregistering a device."""
+    device_token: str
+
+
+class DeviceResponse(BaseModel):
+    """Schema for device response."""
+    id: int
+    user_id: int
+    device_type: str
+    device_token: str
+    device_name: Optional[str] = None
+    is_active: bool
+    last_used_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DeviceListResponse(BaseModel):
+    """Schema for device list response."""
+    devices: List[DeviceResponse]
+    total: int

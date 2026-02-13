@@ -21,6 +21,7 @@ from app.api.users import router as users_router
 from app.api.keywords import router as keywords_router
 from app.api.bookmarks import router as bookmarks_router
 from app.api.matched_deals import router as matched_deals_router
+from app.api.notifications import router as notifications_router
 
 
 # Create FastAPI application
@@ -47,6 +48,7 @@ app.include_router(users_router)
 app.include_router(keywords_router)
 app.include_router(bookmarks_router)
 app.include_router(matched_deals_router)
+app.include_router(notifications_router)
 
 
 @app.on_event("startup")

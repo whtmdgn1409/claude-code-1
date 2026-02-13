@@ -72,6 +72,8 @@ class Notification(Base, TimestampMixin):
         default=NotificationStatus.PENDING,
         index=True
     )
+    scheduled_for = Column(DateTime, nullable=True)  # DND scheduled delivery time
+    read_at = Column(DateTime, nullable=True)  # When user read the notification
     sent_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
     clicked_at = Column(DateTime, nullable=True)
@@ -84,10 +86,12 @@ class Notification(Base, TimestampMixin):
     user = relationship("User", back_populates="notifications")
     deal = relationship("Deal", back_populates="notifications")
 
-    # Indexes
+    # Constraints & Indexes
     __table_args__ = (
+        UniqueConstraint("user_id", "deal_id", name="uq_notification_user_deal"),
         Index("idx_notifications_user_created", "user_id", "created_at"),
         Index("idx_notifications_status_created", "status", "created_at"),
+        Index("idx_notifications_scheduled", "status", "scheduled_for"),
     )
 
     def __repr__(self):

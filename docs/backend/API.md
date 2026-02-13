@@ -398,13 +398,201 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ---
 
-## 구현 예정 API
+### 3. 알림 API ✅
 
-### 3. 키워드 관리 API ⏳
+**파일**: `backend/app/api/notifications.py`
+**상태**: 100% 완료 (2026-02-14)
+
+#### GET /api/v1/notifications
+
+**설명**: 알림 목록 조회 (인증 필요)
+
+**쿼리 파라미터**:
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| page | int | X | 1 | 페이지 번호 |
+| page_size | int | X | 20 | 페이지 크기 (최대 100) |
+
+**응답 예시** (200 OK):
+```json
+{
+  "notifications": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "deal_id": 42,
+      "title": "🔥 맥북 핫딜!",
+      "body": "맥북 프로 M3 최저가 할인 중!",
+      "matched_keywords": ["맥북", "프로"],
+      "status": "sent",
+      "scheduled_for": null,
+      "read_at": null,
+      "sent_at": "2026-02-14T10:30:00",
+      "delivered_at": null,
+      "clicked_at": null,
+      "created_at": "2026-02-14T10:30:00"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "page_size": 20,
+  "unread_count": 3
+}
+```
+
+#### GET /api/v1/notifications/unread-count
+
+**설명**: 읽지 않은 알림 수 (인증 필요)
+
+**응답 예시** (200 OK):
+```json
+{
+  "unread_count": 3
+}
+```
+
+#### POST /api/v1/notifications/read
+
+**설명**: 선택 알림 읽음 처리 (인증 필요)
+
+**요청 Body**:
+```json
+{
+  "notification_ids": [1, 2, 3]
+}
+```
+
+**응답 예시** (200 OK):
+```json
+{
+  "updated": 3
+}
+```
+
+#### POST /api/v1/notifications/read-all
+
+**설명**: 전체 알림 읽음 처리 (인증 필요)
+
+**응답 예시** (200 OK):
+```json
+{
+  "updated": 5
+}
+```
+
+#### POST /api/v1/notifications/{id}/click
+
+**설명**: 알림 클릭 처리 (인증 필요). status → CLICKED, clicked_at 설정.
+
+**응답 예시** (200 OK):
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "deal_id": 42,
+  "title": "🔥 맥북 핫딜!",
+  "body": "맥북 프로 M3 최저가 할인 중!",
+  "status": "clicked",
+  "read_at": "2026-02-14T11:00:00",
+  "clicked_at": "2026-02-14T11:00:00",
+  "created_at": "2026-02-14T10:30:00"
+}
+```
+
+**에러 응답**:
+```json
+// 404 Not Found
+{
+  "detail": "Notification not found"
+}
+```
+
+---
+
+### 4. 디바이스 API ✅
+
+**파일**: `backend/app/api/notifications.py`
+**상태**: 100% 완료 (2026-02-14)
+
+#### POST /api/v1/devices
+
+**설명**: 디바이스 등록 (인증 필요). 같은 토큰이 다른 유저에 등록된 경우 이전 유저의 토큰은 비활성화됨.
+
+**요청 Body**:
+```json
+{
+  "device_type": "ios",
+  "device_token": "fcm-token-abc123...",
+  "device_name": "iPhone 15 Pro"
+}
+```
+
+**응답 예시** (201 Created):
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "device_type": "ios",
+  "device_token": "fcm-token-abc123...",
+  "device_name": "iPhone 15 Pro",
+  "is_active": true,
+  "last_used_at": "2026-02-14T10:00:00",
+  "created_at": "2026-02-14T10:00:00"
+}
+```
+
+#### DELETE /api/v1/devices
+
+**설명**: 디바이스 해제 (인증 필요, soft delete)
+
+**요청 Body**:
+```json
+{
+  "device_token": "fcm-token-abc123..."
+}
+```
+
+**응답** (204 No Content): Body 없음
+
+**에러 응답**:
+```json
+// 404 Not Found
+{
+  "detail": "Device not found or already inactive"
+}
+```
+
+#### GET /api/v1/devices
+
+**설명**: 내 디바이스 목록 (인증 필요)
+
+**응답 예시** (200 OK):
+```json
+{
+  "devices": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "device_type": "ios",
+      "device_token": "fcm-token-abc123...",
+      "device_name": "iPhone 15 Pro",
+      "is_active": true,
+      "last_used_at": "2026-02-14T10:00:00",
+      "created_at": "2026-02-14T10:00:00"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+## 구현 완료 API (기존)
+
+### 5. 키워드 관리 API ✅
 
 **파일**: `backend/app/api/keywords.py`
-**상태**: 다음 작업
-**예상 소요 시간**: 2-3시간
+**상태**: 100% 완료
 
 #### POST /api/v1/keywords
 
@@ -515,11 +703,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ---
 
-### 4. 북마크 API ⏳
+### 6. 북마크 API ✅
 
 **파일**: `backend/app/api/bookmarks.py`
-**상태**: 키워드 API 완료 후
-**예상 소요 시간**: 1-2시간
+**상태**: 100% 완료
 
 #### POST /api/v1/bookmarks
 
@@ -689,10 +876,9 @@ curl "http://localhost:8000/api/v1/deals/search?q=맥북"
 
 ## 다음 단계
 
-1. ⏳ **키워드 관리 API** 구현 (다음 작업)
-2. ⏳ **북마크 API** 구현
-3. ⏳ **알림 API** 구현
-4. ⏳ **소셜 로그인** 연동 (Kakao, Google, Apple)
+1. ⏳ **가격 히스토리 API** (`GET /api/v1/deals/{id}/price-history`)
+2. ⏳ **AI 댓글 요약 API** (딜 상세에 요약 포함)
+3. ⏳ **소셜 로그인** 연동 (Kakao, Google, Apple)
 
 자세한 일정은 [개발 현황](STATUS.md)을 참고하세요.
 
@@ -707,5 +893,5 @@ curl "http://localhost:8000/api/v1/deals/search?q=맥북"
 ---
 
 **작성일**: 2026-02-12
-**최종 업데이트**: 2026-02-12
+**최종 업데이트**: 2026-02-14
 **API 버전**: v1

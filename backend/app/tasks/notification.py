@@ -1,18 +1,21 @@
 """
 Celery tasks for push notification handling.
-Manages notification scheduling, DND periods, and delivery.
+Manages notification scheduling, DND periods, and delivery via FCM.
 """
 from typing import Dict, Any, Optional
 from datetime import datetime
 from celery import Task
+from sqlalchemy.exc import IntegrityError
 
 from app.celery_app import celery_app
 from app.models.database import SessionLocal
-from app.models.user import User
+from app.models.user import User, UserKeyword
 from app.models.deal import Deal
 from app.models.interaction import Notification, NotificationStatus
 from app.models.analytics import DealKeyword
 from app.services.matcher import KeywordMatcher
+from app.services.device import DeviceService
+from app.services.fcm import FCMService
 
 
 class DatabaseTask(Task):
@@ -37,12 +40,11 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
     Send push notification to a user about a matched deal.
 
     Process:
-    1. Check if notification already sent (prevent duplicates)
-    2. Check DND period
-       - If in DND: Schedule for later (PENDING)
-       - If not in DND: Send immediately (SENT)
-    3. Create Notification record
-    4. Send via FCM/APNS (Phase 2 - placeholder for now)
+    1. Check DND period
+       - If in DND: Create notification with scheduled_for, status PENDING
+       - If not in DND: Send immediately via FCM
+    2. Create Notification record (unique constraint prevents duplicates)
+    3. Send via FCM (or dry-run if not configured)
 
     Args:
         user_id: User ID to notify
@@ -65,21 +67,7 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
                 "error": "User or deal not found"
             }
 
-        # Check if notification already exists (prevent duplicates)
-        existing = db.query(Notification).filter(
-            Notification.user_id == user_id,
-            Notification.deal_id == deal_id
-        ).first()
-
-        if existing:
-            return {
-                "status": "skipped",
-                "reason": "duplicate",
-                "notification_id": existing.id
-            }
-
         # Get matched keywords for this user
-        from app.models.user import UserKeyword
         user_keywords = db.query(UserKeyword.keyword).filter(
             UserKeyword.user_id == user_id,
             UserKeyword.is_active == True,
@@ -103,20 +91,33 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
         is_dnd = KeywordMatcher._is_in_dnd_period(user)
 
         if is_dnd:
-            # Schedule for later
+            # Schedule for after DND
             scheduled_time = KeywordMatcher._calculate_scheduled_time(user)
             status = NotificationStatus.PENDING
             sent_at = None
-
+            push_response = None
             print(f"📅 Notification scheduled for {scheduled_time} (DND active)")
         else:
-            # Send immediately
+            # Send immediately via FCM
+            scheduled_time = None
             status = NotificationStatus.SENT
             sent_at = datetime.utcnow()
 
-            # TODO Phase 2: Actually send via FCM/APNS
-            # For now, just mark as sent
-            print(f"📤 Notification sent immediately to user {user_id}")
+            # Get user's device tokens and send
+            device_tokens = DeviceService.get_active_device_tokens(db, user_id)
+            if device_tokens:
+                fcm_data = {"deal_id": str(deal_id), "type": "keyword_match"}
+                push_response = FCMService.send_to_multiple_devices(
+                    device_tokens=device_tokens,
+                    title=title,
+                    body=body,
+                    data=fcm_data
+                )
+            else:
+                push_response = {"skipped": True, "reason": "no_devices"}
+                print(f"⚠️ No active devices for user {user_id}, notification saved only")
+
+            print(f"📤 Notification sent to user {user_id} ({len(device_tokens)} devices)")
 
         # Create notification record
         notification = Notification(
@@ -126,7 +127,9 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
             body=body,
             matched_keywords=matched_keywords,
             status=status,
-            sent_at=sent_at
+            scheduled_for=scheduled_time,
+            sent_at=sent_at,
+            push_response=push_response
         )
 
         db.add(notification)
@@ -140,6 +143,15 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
             "sent_immediately": not is_dnd
         }
 
+    except IntegrityError:
+        db.rollback()
+        return {
+            "status": "skipped",
+            "reason": "duplicate",
+            "user_id": user_id,
+            "deal_id": deal_id
+        }
+
     except Exception as e:
         db.rollback()
         print(f"❌ Notification task failed: {e}")
@@ -149,16 +161,19 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
             raise self.retry(exc=e)
         except self.MaxRetriesExceededError:
             # Create failed notification record
-            notification = Notification(
-                user_id=user_id,
-                deal_id=deal_id,
-                title="Notification Failed",
-                body="",
-                status=NotificationStatus.FAILED,
-                error_message=str(e)
-            )
-            db.add(notification)
-            db.commit()
+            try:
+                notification = Notification(
+                    user_id=user_id,
+                    deal_id=deal_id,
+                    title="Notification Failed",
+                    body="",
+                    status=NotificationStatus.FAILED,
+                    error_message=str(e)
+                )
+                db.add(notification)
+                db.commit()
+            except IntegrityError:
+                db.rollback()
 
             return {
                 "status": "failed",
@@ -178,11 +193,11 @@ def send_push_notification(self, user_id: int, deal_id: int) -> Dict[str, Any]:
 def send_scheduled_notifications(self) -> Dict[str, Any]:
     """
     Send pending notifications that are scheduled to be sent now.
-    Runs every 10 minutes to check for notifications after DND period.
+    Runs periodically to check for notifications after DND period.
 
     Process:
     1. Find PENDING notifications with scheduled_for <= NOW
-    2. Send via FCM/APNS (Phase 2 - placeholder)
+    2. Send via FCM (or dry-run)
     3. Update status to SENT
 
     Returns:
@@ -192,35 +207,40 @@ def send_scheduled_notifications(self) -> Dict[str, Any]:
     self._db = db
 
     try:
-        # Find pending notifications ready to send
         now = datetime.utcnow()
 
-        # For Phase 1, we don't have scheduled_for field yet
-        # So we'll just look for PENDING notifications from users not in DND
+        # Find pending notifications ready to send
         pending_notifications = db.query(Notification).filter(
-            Notification.status == NotificationStatus.PENDING
+            Notification.status == NotificationStatus.PENDING,
+            Notification.scheduled_for != None,
+            Notification.scheduled_for <= now
         ).all()
 
         sent_count = 0
+        failed_count = 0
 
         for notification in pending_notifications:
-            # Check if user is still in DND
-            user = db.query(User).filter(User.id == notification.user_id).first()
+            # Get user's device tokens
+            device_tokens = DeviceService.get_active_device_tokens(db, notification.user_id)
 
-            if not user:
-                continue
+            if device_tokens:
+                fcm_data = {"deal_id": str(notification.deal_id), "type": "scheduled"}
+                push_response = FCMService.send_to_multiple_devices(
+                    device_tokens=device_tokens,
+                    title=notification.title,
+                    body=notification.body,
+                    data=fcm_data
+                )
+                notification.push_response = push_response
+            else:
+                push_response = {"skipped": True, "reason": "no_devices"}
+                notification.push_response = push_response
 
-            is_dnd = KeywordMatcher._is_in_dnd_period(user)
-
-            if not is_dnd:
-                # Send notification
-                # TODO Phase 2: Actually send via FCM/APNS
-
-                # Update status
-                notification.status = NotificationStatus.SENT
-                notification.sent_at = datetime.utcnow()
-
-                sent_count += 1
+            # Update status
+            notification.status = NotificationStatus.SENT
+            notification.sent_at = datetime.utcnow()
+            notification.scheduled_for = None
+            sent_count += 1
 
         db.commit()
 
@@ -228,7 +248,8 @@ def send_scheduled_notifications(self) -> Dict[str, Any]:
 
         return {
             "status": "success",
-            "sent_count": sent_count
+            "sent_count": sent_count,
+            "failed_count": failed_count
         }
 
     except Exception as e:
