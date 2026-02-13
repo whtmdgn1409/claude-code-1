@@ -8,6 +8,9 @@ from celery import Task
 from app.celery_app import celery_app
 from app.models.database import SessionLocal
 from app.crawlers.ppomppu import PpomppuCrawler
+from app.crawlers.ruliweb import RuliwebCrawler
+from app.crawlers.quasarzone import QuasarzoneCrawler
+from app.crawlers.fmkorea import FmkoreaCrawler
 from app.services.keyword_extractor import KeywordExtractor
 from app.services.matcher import KeywordMatcher
 from app.tasks.notification import send_push_notification
@@ -23,50 +26,24 @@ class DatabaseTask(Task):
             self._db.close()
 
 
-@celery_app.task(
-    bind=True,
-    base=DatabaseTask,
-    max_retries=3,
-    default_retry_delay=60,
-    name="app.tasks.crawler.run_ppomppu_crawler"
-)
-def run_ppomppu_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
+def _run_crawler_task(task, crawler, db, max_pages: int) -> Dict[str, Any]:
     """
-    Run Ppomppu crawler and match deals to users.
-
-    Process:
-    1. Crawl Ppomppu (2 pages by default)
-    2. For each new deal:
-       a. Extract keywords
-       b. Find matching users
-       c. Send push notifications (async)
-    3. Return statistics
-
-    Args:
-        max_pages: Number of pages to crawl (default: 2)
-
-    Returns:
-        Dictionary with crawling and matching statistics
+    Common crawler execution logic.
+    Runs the crawler, extracts keywords, matches users, and queues notifications.
     """
-    db = SessionLocal()
-    self._db = db
+    source_name = crawler.source_name
 
     try:
-        print(f"🕷️  Starting Ppomppu crawler (max_pages={max_pages})...")
-
-        # Initialize crawler
-        crawler = PpomppuCrawler(db, include_overseas=False)
+        print(f"🕷️  Starting {source_name} crawler (max_pages={max_pages})...")
 
         # Run crawler
         stats = crawler.run(max_pages=max_pages)
 
         # Get newly created deals from this run
         if crawler.crawler_run and stats["new_created"] > 0:
-            # Get the new deals
             from app.models.deal import Deal
             from datetime import datetime, timedelta
 
-            # Get deals created in the last 5 minutes (should be from this run)
             cutoff = datetime.utcnow() - timedelta(minutes=5)
             new_deals = db.query(Deal).filter(
                 Deal.source_id == crawler.source.id,
@@ -79,29 +56,24 @@ def run_ppomppu_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
             total_notifications = 0
 
             for deal in new_deals:
-                # Extract keywords
                 keyword_count = KeywordExtractor.extract_and_save(db, deal)
                 print(f"   Deal #{deal.id}: {keyword_count} keywords extracted")
 
-                # Refresh deal to get keywords
                 db.refresh(deal)
 
-                # Find matching users
                 matched_users = KeywordMatcher.match_deal_to_users(db, deal)
                 total_matched_users += len(matched_users)
 
                 print(f"   Deal #{deal.id}: Matched {len(matched_users)} users")
 
-                # Send push notifications asynchronously
                 for user in matched_users:
-                    # Queue notification task
                     send_push_notification.delay(user.id, deal.id)
                     total_notifications += 1
 
             stats["matched_users"] = total_matched_users
             stats["notifications_queued"] = total_notifications
 
-            print(f"✅ Crawler completed!")
+            print(f"✅ {source_name} crawler completed!")
             print(f"   - New deals: {stats['new_created']}")
             print(f"   - Matched users: {total_matched_users}")
             print(f"   - Notifications queued: {total_notifications}")
@@ -109,25 +81,82 @@ def run_ppomppu_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
         else:
             stats["matched_users"] = 0
             stats["notifications_queued"] = 0
-            print(f"✅ Crawler completed (no new deals)")
+            print(f"✅ {source_name} crawler completed (no new deals)")
 
-        return {
-            "status": "success",
-            "stats": stats
-        }
+        return {"status": "success", "source": source_name, "stats": stats}
 
     except Exception as e:
-        print(f"❌ Crawler task failed: {e}")
+        print(f"❌ {source_name} crawler task failed: {e}")
 
-        # Retry with exponential backoff
         try:
-            raise self.retry(exc=e, countdown=60 * (self.request.retries + 1))
-        except self.MaxRetriesExceededError:
+            raise task.retry(exc=e, countdown=60 * (task.request.retries + 1))
+        except task.MaxRetriesExceededError:
             return {
                 "status": "failed",
+                "source": source_name,
                 "error": str(e),
                 "retries_exceeded": True
             }
 
     finally:
         db.close()
+
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    max_retries=3,
+    default_retry_delay=60,
+    name="app.tasks.crawler.run_ppomppu_crawler"
+)
+def run_ppomppu_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
+    """Run Ppomppu crawler and match deals to users."""
+    db = SessionLocal()
+    self._db = db
+    crawler = PpomppuCrawler(db, include_overseas=False)
+    return _run_crawler_task(self, crawler, db, max_pages)
+
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    max_retries=3,
+    default_retry_delay=60,
+    name="app.tasks.crawler.run_ruliweb_crawler"
+)
+def run_ruliweb_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
+    """Run Ruliweb crawler and match deals to users."""
+    db = SessionLocal()
+    self._db = db
+    crawler = RuliwebCrawler(db)
+    return _run_crawler_task(self, crawler, db, max_pages)
+
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    max_retries=3,
+    default_retry_delay=60,
+    name="app.tasks.crawler.run_quasarzone_crawler"
+)
+def run_quasarzone_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
+    """Run Quasarzone crawler and match deals to users."""
+    db = SessionLocal()
+    self._db = db
+    crawler = QuasarzoneCrawler(db)
+    return _run_crawler_task(self, crawler, db, max_pages)
+
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    max_retries=3,
+    default_retry_delay=60,
+    name="app.tasks.crawler.run_fmkorea_crawler"
+)
+def run_fmkorea_crawler(self, max_pages: int = 2) -> Dict[str, Any]:
+    """Run FMKorea crawler and match deals to users."""
+    db = SessionLocal()
+    self._db = db
+    crawler = FmkoreaCrawler(db)
+    return _run_crawler_task(self, crawler, db, max_pages)

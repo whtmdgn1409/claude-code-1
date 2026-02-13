@@ -37,17 +37,41 @@ celery_app.conf.beat_schedule = {
     # Crawl Ppomppu every 5 minutes
     "crawl-ppomppu-every-5-minutes": {
         "task": "app.tasks.crawler.run_ppomppu_crawler",
-        "schedule": 300.0,  # 5 minutes in seconds
+        "schedule": 300.0,  # 5 minutes
         "options": {
-            "expires": 240  # Task expires if not executed within 4 minutes
+            "expires": 240
+        }
+    },
+    # Crawl Ruliweb every 5 minutes (offset by 1 min to avoid simultaneous starts)
+    "crawl-ruliweb-every-5-minutes": {
+        "task": "app.tasks.crawler.run_ruliweb_crawler",
+        "schedule": 300.0,
+        "options": {
+            "expires": 240
+        }
+    },
+    # Crawl Quasarzone every 5 minutes
+    "crawl-quasarzone-every-5-minutes": {
+        "task": "app.tasks.crawler.run_quasarzone_crawler",
+        "schedule": 300.0,
+        "options": {
+            "expires": 240
+        }
+    },
+    # Crawl FMKorea every 5 minutes
+    "crawl-fmkorea-every-5-minutes": {
+        "task": "app.tasks.crawler.run_fmkorea_crawler",
+        "schedule": 300.0,
+        "options": {
+            "expires": 240
         }
     },
     # Send scheduled notifications every 10 minutes
     "send-scheduled-notifications-every-10-minutes": {
         "task": "app.tasks.notification.send_scheduled_notifications",
-        "schedule": crontab(minute="*/10"),  # Every 10 minutes
+        "schedule": crontab(minute="*/10"),
         "options": {
-            "expires": 540  # Task expires after 9 minutes
+            "expires": 540
         }
     },
 }
