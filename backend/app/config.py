@@ -36,10 +36,21 @@ class Settings(BaseSettings):
     APNS_CERT_PATH: Optional[str] = None
     APNS_KEY_PATH: Optional[str] = None
 
+    # AI Summarization settings
+    AI_SERVICE_PROVIDER: str = "openai"  # "openai" | "claude" | "none"
+    AI_API_KEY: Optional[str] = None
+    AI_MODEL: str = "gpt-3.5-turbo"
+    AI_MAX_TOKENS: int = 500
+    AI_TEMPERATURE: float = 0.3
+    AI_CACHE_TTL_HOURS: int = 24
+
     # Crawler settings
     CRAWLER_USER_AGENT: str = "DealMoa/1.0 (+https://dealmoa.app)"
     CRAWLER_REQUEST_DELAY: float = 1.0  # seconds between requests
     CRAWLER_MAX_RETRIES: int = 3
+
+    # Database bootstrap
+    AUTO_CREATE_SCHEMA: bool = False
 
     # Celery settings
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"

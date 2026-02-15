@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.config import settings
-from app.models.database import engine, get_db
+from app.models.database import engine, get_db, init_db
 from app.models import Base
 
 # Import all models to ensure they're registered
@@ -57,12 +57,15 @@ async def startup_event():
     print("🚀 Starting DealMoa API...")
     print(f"📊 Environment: {settings.ENVIRONMENT}")
 
-    # Create database tables if they don't exist
-    # Note: In production, use Alembic migrations instead
-    if settings.ENVIRONMENT == "development":
-        print("🗄️  Creating database tables (development mode)...")
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database tables ready")
+    # Create database tables if they don't exist.
+    # In production, set AUTO_CREATE_SCHEMA=true only for bootstrap/new DB initialization.
+    if settings.ENVIRONMENT == "development" or settings.AUTO_CREATE_SCHEMA:
+        print("🗄️  Ensuring database tables exist...")
+        try:
+            init_db()
+            print("✅ Database tables ready")
+        except Exception as e:
+            print(f"⚠️ Database bootstrap failed: {e}")
 
 
 @app.on_event("shutdown")
