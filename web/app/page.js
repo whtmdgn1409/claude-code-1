@@ -8,6 +8,21 @@ import { normalizeQuery } from '@/lib/deals';
 export const revalidate = 120;
 
 export default async function HomePage({ searchParams }) {
+  const toFriendlyError = (error) => {
+    if (!error) return '게시판 데이터를 불러오지 못했습니다.';
+
+    const message = String(error.message || '');
+    if (message.includes('API request failed: 404')) {
+      return '요청한 API 경로를 찾지 못했습니다. NEXT_PUBLIC_API_BASE_URL을 확인해 주세요.';
+    }
+
+    if (message.includes('fetch failed') || message.includes('ECONNREFUSED')) {
+      return '백엔드 API에 연결할 수 없습니다. 서버가 실행 중인지/도메인이 맞는지 확인해 주세요.';
+    }
+
+    return message || '게시판 데이터를 불러오는 중 알 수 없는 오류가 발생했습니다.';
+  };
+
   const normalized = normalizeQuery({
     page: searchParams?.page,
     pageSize: 20,
@@ -29,22 +44,35 @@ export default async function HomePage({ searchParams }) {
     page: normalized.page,
   };
 
-  const [dealsData, sources, categories] = await Promise.all([
-    getDeals({
-      page: query.page,
-      pageSize: query.page_size,
-      keyword: query.q,
-      sourceId: query.source_id || undefined,
-      categoryId: query.category_id || undefined,
-      sortBy: query.sort_by,
-      order: query.order,
-    }),
-    getSources(),
-    getCategories(),
-  ]);
+  let safeDeals = [];
+  let safeTotalPages = 1;
+  let sources = [];
+  let categories = [];
+  let boardError = '';
 
-  const safeDeals = dealsData?.deals ?? [];
-  const safeTotalPages = Math.max(1, dealsData?.total_pages || 1);
+  try {
+    const [dealsData, sourceData, categoryData] = await Promise.all([
+      getDeals({
+        page: query.page,
+        pageSize: query.page_size,
+        keyword: query.q,
+        sourceId: query.source_id || undefined,
+        categoryId: query.category_id || undefined,
+        sortBy: query.sort_by,
+        order: query.order,
+      }),
+      getSources(),
+      getCategories(),
+    ]);
+
+    safeDeals = dealsData?.deals || [];
+    safeTotalPages = Math.max(1, dealsData?.total_pages || 1);
+    sources = sourceData || [];
+    categories = categoryData || [];
+  } catch (error) {
+    boardError = toFriendlyError(error);
+  }
+
   const searchHint = query.q && query.q.length > 0 && query.q.length < 2
     ? '검색어는 2자 이상으로 입력하세요. 현재는 전체 목록으로 전환됩니다.'
     : '';
@@ -87,6 +115,7 @@ export default async function HomePage({ searchParams }) {
           )}
         </nav>
       </noscript>
+      {boardError ? <p className="error-state">{boardError}</p> : null}
       {searchHint ? <p className="error-state">{searchHint}</p> : null}
       <BoardFeed
         initialDeals={safeDeals}

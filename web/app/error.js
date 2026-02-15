@@ -10,13 +10,16 @@ const errorMessages = {
 };
 
 export default function Error({ error, reset }) {
+  const message = error?.message || '요청 처리 중 일시적인 오류가 발생했습니다.';
+
   return (
     <main className="board-error">
       <h1>{errorMessages.title}</h1>
       <p className="error-state">{errorMessages.description}</p>
       <p className="error-state detail" role="alert">
-        {error.message || '알 수 없는 오류가 발생했습니다.'}
+        {message}
       </p>
+      {error?.digest ? <p className="error-state">{`코드: ${error.digest}`}</p> : null}
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={() => reset()}>
           {errorMessages.retry}

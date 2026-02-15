@@ -35,11 +35,46 @@ export async function generateMetadata({ params }) {
 export default async function DealDetailPage({ params, searchParams }) {
   const id = Number(params.id);
   const backUrl = buildBackUrl({ searchParams: searchParams || {} });
+  let deal = null;
+  let summary = null;
+  let loadError = '';
 
-  const [deal, summary] = await Promise.all([
-    getDeal(id),
-    getDealSummary(id).catch(() => null),
-  ]);
+  try {
+    const [dealData, summaryData] = await Promise.all([
+      getDeal(id),
+      getDealSummary(id).catch(() => null),
+    ]);
+    deal = dealData;
+    summary = summaryData;
+  } catch (error) {
+    loadError = error?.message || '딜 상세 조회 중 오류가 발생했습니다.';
+  }
+
+  if (loadError) {
+    return (
+      <main className="detail-main">
+        <h1>딜 상세를 표시할 수 없습니다</h1>
+        <p className="error-state" role="alert">
+          {loadError}
+        </p>
+        <div className="actions">
+          <Link href="/" className="btn btn-primary">
+            목록으로
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (!deal) {
+    return (
+      <main className="detail-main">
+        <h1>딜 상세를 표시할 수 없습니다</h1>
+        <p className="error-state">딜 데이터가 존재하지 않습니다.</p>
+      </main>
+    );
+  }
+
   const sourceName = deal.source?.display_name || deal.source?.name || '알 수 없음';
   const categoryName = deal.category?.name || '미분류';
 
