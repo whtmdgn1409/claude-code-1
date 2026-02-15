@@ -3,6 +3,7 @@ Deal API endpoints.
 Provides endpoints for listing, searching, and viewing deals.
 """
 from typing import List, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, asc, func, or_, text
@@ -10,15 +11,19 @@ from math import ceil
 
 from app.models.database import get_db
 from app.models.deal import Deal, DealSource, Category
+from app.models.analytics import PriceHistory
 from app.models.user import User
 from app.schemas.deal import (
     DealResponse,
     DealListResponse,
     DealDetailResponse,
     DealSourceResponse,
-    CategoryResponse
+    CategoryResponse,
+    PriceHistoryWithStats,
+    PriceStatistics
 )
 from app.services.bookmark import BookmarkService
+from app.services.price import PriceService
 from app.utils.auth import get_current_user_optional
 
 router = APIRouter(prefix="/api/v1", tags=["deals"])
@@ -213,6 +218,55 @@ async def get_deal(
         response.is_bookmarked = False
 
     return response
+
+
+@router.get(
+    "/deals/{deal_id}/price-history",
+    response_model=PriceHistoryWithStats,
+    summary="Get price history for a deal"
+)
+async def get_deal_price_history(
+    deal_id: int,
+    days: int = Query(30, ge=1, le=365, description="Days to look back"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get price history with statistical summary.
+
+    Returns:
+    - **history**: List of price records (ordered by date DESC)
+    - **statistics**: Price statistics including lowest, highest, average, current, record_count, and price_signal
+    """
+    # Check if deal exists
+    deal = db.query(Deal).filter(
+        Deal.id == deal_id,
+        Deal.deleted_at == None
+    ).first()
+
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+
+    # Query price history for specified period
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    history = db.query(PriceHistory).filter(
+        PriceHistory.deal_id == deal_id,
+        PriceHistory.recorded_at >= cutoff_date
+    ).order_by(PriceHistory.recorded_at.desc()).all()
+
+    # Get price statistics
+    stats = PriceService.get_price_statistics(db, deal)
+
+    return PriceHistoryWithStats(
+        history=history,
+        statistics=PriceStatistics(
+            lowest_price=stats.get("lowest"),
+            highest_price=stats.get("highest"),
+            average_price=stats.get("average"),
+            current_price=deal.price,
+            record_count=len(history),
+            price_signal=deal.price_signal
+        )
+    )
 
 
 # ============================================================================

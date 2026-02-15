@@ -178,3 +178,22 @@ class PriceHistoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PriceStatistics(BaseModel):
+    """Schema for price statistics."""
+    lowest_price: Optional[int] = None
+    highest_price: Optional[int] = None
+    average_price: Optional[int] = None
+    current_price: Optional[int] = None
+    record_count: int
+    price_signal: Optional[str] = None
+
+
+class PriceHistoryWithStats(BaseModel):
+    """Price history with statistical summary."""
+    history: List[PriceHistoryResponse]
+    statistics: PriceStatistics
+
+    class Config:
+        from_attributes = True

@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.models import CrawlerRun, CrawlerError, CrawlerState, CrawlerStatus, Deal, DealSource
+from app.models.analytics import PriceHistory
+from app.services.price import PriceService
 from app.config import settings
 
 
@@ -137,6 +139,15 @@ class BaseCrawler(ABC):
             )
 
             if existing_deal:
+                # Check for price changes
+                price_changed = False
+                current_price = deal_data.get("price")
+                if current_price and current_price != existing_deal.price:
+                    price_changed = True
+                    existing_deal.price = current_price
+                    existing_deal.original_price = deal_data.get("original_price")
+                    existing_deal.discount_rate = deal_data.get("discount_rate")
+
                 # Update existing deal metrics
                 existing_deal.upvotes = deal_data.get("upvotes", existing_deal.upvotes)
                 existing_deal.downvotes = deal_data.get("downvotes", existing_deal.downvotes)
@@ -145,6 +156,13 @@ class BaseCrawler(ABC):
 
                 # Recalculate hot score
                 existing_deal.calculate_hot_score()
+
+                # Record price history and update signal if price changed
+                if price_changed:
+                    self._record_price_history(existing_deal, deal_data)
+                    new_signal = PriceService.calculate_price_signal(self.db, existing_deal)
+                    if new_signal:
+                        existing_deal.price_signal = new_signal
 
                 self.db.commit()
                 self.stats["updated"] += 1
@@ -161,6 +179,12 @@ class BaseCrawler(ABC):
 
                 self.db.add(deal)
                 self.db.commit()
+                self.db.refresh(deal)
+
+                # Record initial price history
+                self._record_price_history(deal, deal_data)
+                self.db.commit()
+
                 self.stats["new_created"] += 1
                 return deal
 
@@ -183,6 +207,42 @@ class BaseCrawler(ABC):
                 item_data=deal_data
             )
             return None
+
+    def _record_price_history(self, deal: Deal, deal_data: Dict) -> None:
+        """
+        Record price snapshot to PriceHistory table.
+
+        Args:
+            deal: Deal object with ID
+            deal_data: Dictionary with deal information including price
+        """
+        # Skip if no price available
+        if not deal_data.get("price"):
+            return
+
+        try:
+            price_record = PriceHistory(
+                deal_id=deal.id,
+                mall_name=deal_data.get("mall_name"),
+                mall_product_id=deal_data.get("mall_product_id"),
+                product_name=deal_data.get("product_name"),
+                price=deal_data["price"],
+                original_price=deal_data.get("original_price"),
+                discount_rate=deal_data.get("discount_rate"),
+                recorded_at=datetime.utcnow()
+            )
+
+            self.db.add(price_record)
+            # Commit is handled by caller (_save_deal)
+
+        except Exception as e:
+            # Log error but don't fail the crawl
+            self._log_error(
+                "PriceHistoryError",
+                str(e),
+                url=deal_data.get("url"),
+                item_data={"deal_id": deal.id, "price": deal_data.get("price")}
+            )
 
     def _respect_rate_limit(self):
         """Sleep to respect rate limiting."""
