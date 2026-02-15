@@ -2,7 +2,7 @@
 Core database engine and session management.
 Provides SQLAlchemy engine, session factory, and base class for all models.
 """
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base, Session
 from sqlalchemy.pool import QueuePool
 from app.config import settings
@@ -64,6 +64,11 @@ def init_db():
         PriceHistory, DealStatistics, DealKeyword,
         CrawlerRun, CrawlerError, CrawlerState
     )
+
+    # Ensure optional extension required by trigram indexes exists.
+    # pg_trgm is required for gin_trgm_ops indexes on text fields.
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
 
     # Create all tables
     Base.metadata.create_all(bind=engine)
