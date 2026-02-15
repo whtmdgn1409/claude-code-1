@@ -56,6 +56,8 @@ async def startup_event():
     """Application startup event - initialize database."""
     print("🚀 Starting DealMoa API...")
     print(f"📊 Environment: {settings.ENVIRONMENT}")
+    print(f"🛠 AUTO_CREATE_SCHEMA: {settings.AUTO_CREATE_SCHEMA}")
+    print(f"🐞 DEBUG: {settings.DEBUG}")
 
     # Create database tables if they don't exist.
     # In production, set AUTO_CREATE_SCHEMA=true only for bootstrap/new DB initialization.
