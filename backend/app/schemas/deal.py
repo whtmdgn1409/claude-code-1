@@ -3,7 +3,9 @@ Pydantic schemas for Deal-related API requests and responses.
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, HttpUrl
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 import enum
 
 
@@ -67,6 +69,28 @@ class DealBase(BaseModel):
     price: Optional[int] = Field(None, ge=0)
     original_price: Optional[int] = Field(None, ge=0)
     discount_rate: Optional[float] = Field(None, ge=0, le=100)
+
+    @field_validator("thumbnail_url", "mall_product_url", mode="before")
+    @classmethod
+    def _normalize_url(cls, value: Any):
+        if value in (None, ""):
+            return None
+
+        if not isinstance(value, str):
+            return None
+
+        normalized = value.strip()
+        if not normalized:
+            return None
+
+        if normalized.startswith("//"):
+            normalized = "https:" + normalized
+
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return None
+
+        return normalized
 
 
 class DealCreate(DealBase):
@@ -194,6 +218,23 @@ class PriceHistoryWithStats(BaseModel):
     """Price history with statistical summary."""
     history: List[PriceHistoryResponse]
     statistics: PriceStatistics
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# AI Summary Schemas
+# ============================================================================
+
+class AISummaryResponse(BaseModel):
+    """Schema for AI summary response."""
+    deal_id: int
+    summary: Optional[str] = None
+    status: str  # "available", "generating", "not_configured"
+    generated_at: Optional[datetime] = None
+    comments_count: int
+    provider: Optional[str] = None  # "openai", "claude", "dry-run", "cached"
 
     class Config:
         from_attributes = True
