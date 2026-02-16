@@ -20,11 +20,15 @@ from app.schemas.deal import (
     DealSourceResponse,
     CategoryResponse,
     PriceHistoryWithStats,
-    PriceStatistics
+    PriceStatistics,
+    AISummaryResponse
 )
 from app.services.bookmark import BookmarkService
 from app.services.price import PriceService
+from app.services.ai_summary import AISummaryService
 from app.utils.auth import get_current_user_optional
+from app.tasks.ai_summary import generate_deal_summary
+from app.config import settings
 
 router = APIRouter(prefix="/api/v1", tags=["deals"])
 
@@ -266,6 +270,72 @@ async def get_deal_price_history(
             record_count=len(history),
             price_signal=deal.price_signal
         )
+    )
+
+
+# ============================================================================
+# AI Summary Endpoint
+# ============================================================================
+
+@router.get(
+    "/deals/{deal_id}/summary",
+    response_model=AISummaryResponse,
+    summary="Get or generate AI summary for a deal"
+)
+async def get_deal_summary(
+    deal_id: int,
+    force_regenerate: bool = Query(False, description="Force regenerate summary"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get AI-generated 3-line summary of deal and comments.
+
+    - Returns cached summary if fresh (< 24 hours)
+    - Triggers async generation if stale or missing
+    - force_regenerate=true bypasses cache
+
+    **Response status**:
+    - **available**: Summary exists and returned
+    - **generating**: Summary is being generated asynchronously
+    - **not_configured**: AI service not configured (dry-run mode)
+    """
+    # Get deal
+    deal = db.query(Deal).filter(
+        Deal.id == deal_id,
+        Deal.deleted_at == None
+    ).first()
+
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+
+    # Check if summary is fresh
+    is_fresh = False
+    if deal.ai_summary and deal.ai_summary_generated_at and not force_regenerate:
+        age_hours = (datetime.utcnow() - deal.ai_summary_generated_at).total_seconds() / 3600
+        is_fresh = age_hours < settings.AI_CACHE_TTL_HOURS
+
+    # Return cached summary
+    if is_fresh:
+        return AISummaryResponse(
+            deal_id=deal_id,
+            summary=deal.ai_summary,
+            status="available",
+            generated_at=deal.ai_summary_generated_at,
+            comments_count=len(deal.comments or []),
+            provider="cached"
+        )
+
+    # Trigger async generation
+    generate_deal_summary.delay(deal_id)
+
+    # Return status
+    return AISummaryResponse(
+        deal_id=deal_id,
+        summary=deal.ai_summary,  # Old summary if exists, else None
+        status="generating" if AISummaryService.is_configured() else "not_configured",
+        generated_at=deal.ai_summary_generated_at,
+        comments_count=len(deal.comments or []),
+        provider=None
     )
 
 

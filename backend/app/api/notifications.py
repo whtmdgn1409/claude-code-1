@@ -12,6 +12,7 @@ from app.schemas.interaction import (
     NotificationListResponse,
     NotificationUnreadCountResponse,
     NotificationMarkReadRequest,
+    NotificationMarkReadResponse,
     DeviceRegisterRequest,
     DeviceUnregisterRequest,
     DeviceResponse,
@@ -85,7 +86,8 @@ def get_unread_count(
 @router.post(
     "/notifications/read",
     summary="Mark notifications as read",
-    description="Mark specific notifications as read."
+    description="Mark specific notifications as read.",
+    response_model=NotificationMarkReadResponse
 )
 def mark_notifications_read(
     request: NotificationMarkReadRequest,
@@ -102,13 +104,15 @@ def mark_notifications_read(
         user_id=current_user.id,
         notification_ids=request.notification_ids
     )
-    return {"updated": updated}
+    unread_count = NotificationService.get_unread_count(db, current_user.id)
+    return NotificationMarkReadResponse(updated=updated, unread_count=unread_count)
 
 
 @router.post(
     "/notifications/read-all",
     summary="Mark all as read",
-    description="Mark all notifications as read."
+    description="Mark all notifications as read.",
+    response_model=NotificationMarkReadResponse
 )
 def mark_all_notifications_read(
     current_user: User = Depends(get_current_user),
@@ -116,7 +120,8 @@ def mark_all_notifications_read(
 ):
     """Mark all unread notifications as read for the current user."""
     updated = NotificationService.mark_all_as_read(db, current_user.id)
-    return {"updated": updated}
+    unread_count = NotificationService.get_unread_count(db, current_user.id)
+    return NotificationMarkReadResponse(updated=updated, unread_count=unread_count)
 
 
 @router.post(

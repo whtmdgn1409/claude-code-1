@@ -3,7 +3,7 @@ Pydantic schemas for user interaction API requests and responses.
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models.interaction import NotificationStatus
 
 
@@ -85,7 +85,13 @@ class NotificationUnreadCountResponse(BaseModel):
 
 class NotificationMarkReadRequest(BaseModel):
     """Schema for marking notifications as read/clicked."""
-    notification_ids: List[int]
+    notification_ids: List[int] = Field(min_length=1)
+
+
+class NotificationMarkReadResponse(BaseModel):
+    """Schema for mark-as-read result."""
+    updated: int
+    unread_count: int
 
 
 # ============================================================================

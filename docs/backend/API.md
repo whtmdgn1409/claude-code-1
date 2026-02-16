@@ -43,14 +43,14 @@
 **응답 예시**:
 ```json
 {
-  "items": [
+  "deals": [
     {
       "id": 1,
       "title": "맥북 프로 M3 최저가!",
       "price": 1990000,
       "original_price": 2490000,
       "discount_rate": 20.08,
-      "image_url": "https://...",
+      "thumbnail_url": "https://...",
       "mall_name": "쿠팡",
       "hot_score": 245.5,
       "price_signal": "lowest",
@@ -74,7 +74,7 @@
   "total": 150,
   "page": 1,
   "page_size": 20,
-  "pages": 8
+  "total_pages": 8
 }
 ```
 
@@ -97,7 +97,7 @@
   "original_price": 2490000,
   "discount_rate": 20.08,
   "price_signal": "lowest",
-  "image_url": "https://...",
+  "thumbnail_url": "https://...",
   "mall_name": "쿠팡",
   "mall_url": "https://coupang.com/...",
   "url": "https://ppomppu.co.kr/...",
@@ -114,11 +114,11 @@
   "price_history": [
     {
       "price": 1990000,
-      "snapshot_at": "2026-02-12T14:30:00"
+      "recorded_at": "2026-02-12T14:30:00"
     },
     {
       "price": 2190000,
-      "snapshot_at": "2026-02-05T10:00:00"
+      "recorded_at": "2026-02-05T10:00:00"
     }
   ]
 }
@@ -133,24 +133,23 @@
 **쿼리 파라미터**:
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|------|--------|------|
-| q | string | O | - | 검색 키워드 |
+| keyword | string | O | - | 검색 키워드 |
 | page | int | X | 1 | 페이지 번호 |
 | page_size | int | X | 20 | 페이지 크기 |
 
 **요청 예시**:
 ```
-GET /api/v1/deals/search?q=맥북&page=1&page_size=20
+GET /api/v1/deals/search?keyword=맥북&page=1&page_size=20
 ```
 
 **응답 예시**:
 ```json
 {
-  "items": [ ... ],
+  "deals": [ ... ],
   "total": 15,
   "page": 1,
   "page_size": 20,
-  "pages": 1,
-  "query": "맥북"
+  "total_pages": 1
 }
 ```
 
@@ -354,8 +353,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
   "username": "newhunter",
   "display_name": "새로운딜헌터",
   "age": 30,
-  "gender": "male",
-  "updated_at": "2026-02-12T15:30:00"
+  "gender": "male"
 }
 ```
 
@@ -379,8 +377,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
   "push_enabled": true,
   "dnd_enabled": true,
   "dnd_start_time": "22:00:00",
-  "dnd_end_time": "08:00:00",
-  "updated_at": "2026-02-12T15:30:00"
+  "dnd_end_time": "08:00:00"
 }
 ```
 
@@ -594,7 +591,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 **파일**: `backend/app/api/keywords.py`
 **상태**: 100% 완료
 
-#### POST /api/v1/keywords
+#### POST /api/v1/users/keywords
 
 **설명**: 키워드 추가 (인증 필요)
 
@@ -631,41 +628,99 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 }
 ```
 
-#### GET /api/v1/keywords
+#### POST /api/v1/users/keywords/batch
+
+**설명**: 다건 키워드 추가 (인증 필요)
+
+**요청 Body**:
+```json
+[
+  {
+    "keyword": "아이폰",
+    "is_inclusion": true
+  },
+  {
+    "keyword": "중고",
+    "is_inclusion": false
+  }
+]
+```
+
+**응답 예시** (201 Created):
+```json
+{
+  "keywords": [
+    {
+      "id": 4,
+      "user_id": 1,
+      "keyword": "아이폰",
+      "is_inclusion": true,
+      "is_active": true,
+      "created_at": "2026-02-12T17:00:00"
+    },
+    {
+      "id": 5,
+      "user_id": 1,
+      "keyword": "중고",
+      "is_inclusion": false,
+      "is_active": true,
+      "created_at": "2026-02-12T17:01:00"
+    }
+  ],
+  "total_count": 2,
+  "inclusion_count": 1,
+  "exclusion_count": 1
+}
+```
+
+**에러 응답**:
+```json
+// 400 Bad Request - 20개 초과
+{
+  "detail": "Maximum 20 keywords allowed"
+}
+```
+
+#### GET /api/v1/users/keywords
 
 **설명**: 내 키워드 목록 (인증 필요)
 
 **응답 예시**:
 ```json
 {
-  "inclusion_keywords": [
+  "keywords": [
     {
       "id": 1,
+      "user_id": 1,
       "keyword": "맥북",
+      "is_inclusion": true,
       "is_active": true,
       "created_at": "2026-02-12T15:30:00"
     },
     {
       "id": 2,
+      "user_id": 1,
       "keyword": "아이패드",
+      "is_inclusion": true,
       "is_active": true,
       "created_at": "2026-02-12T15:31:00"
-    }
-  ],
-  "exclusion_keywords": [
+    },
     {
       "id": 3,
+      "user_id": 1,
       "keyword": "중고",
+      "is_inclusion": false,
       "is_active": true,
       "created_at": "2026-02-12T15:32:00"
     }
   ],
   "total_count": 3,
-  "max_count": 20
+  "inclusion_count": 2,
+  "exclusion_count": 1
 }
 ```
 
-#### PUT /api/v1/keywords/{id}
+#### PUT /api/v1/users/keywords/{id}
 
 **설명**: 키워드 활성화/비활성화 (인증 필요)
 
@@ -681,12 +736,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 {
   "id": 1,
   "keyword": "맥북",
+  "user_id": 1,
+  "is_inclusion": true,
   "is_active": false,
-  "updated_at": "2026-02-12T16:00:00"
+  "created_at": "2026-02-12T15:30:00"
 }
 ```
 
-#### DELETE /api/v1/keywords/{id}
+#### DELETE /api/v1/users/keywords/{id}
 
 **설명**: 키워드 삭제 (인증 필요)
 
@@ -753,7 +810,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 **응답 예시**:
 ```json
 {
-  "items": [
+  "bookmarks": [
     {
       "id": 1,
       "created_at": "2026-02-12T16:00:00",
@@ -761,7 +818,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
         "id": 123,
         "title": "맥북 프로 M3 최저가!",
         "price": 1990000,
-        "image_url": "https://...",
+        "thumbnail_url": "https://...",
         "published_at": "2026-02-12T14:30:00"
       }
     }
@@ -769,7 +826,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
   "total": 10,
   "page": 1,
   "page_size": 20,
-  "pages": 1
+  "total_pages": 1
 }
 ```
 
@@ -856,7 +913,7 @@ curl http://localhost:8000/api/v1/users/me \
 curl "http://localhost:8000/api/v1/deals?page=1&page_size=10"
 
 # 딜 검색
-curl "http://localhost:8000/api/v1/deals/search?q=맥북"
+curl "http://localhost:8000/api/v1/deals/search?keyword=맥북"
 ```
 
 ---

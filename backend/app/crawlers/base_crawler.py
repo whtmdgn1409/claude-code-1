@@ -185,6 +185,22 @@ class BaseCrawler(ABC):
                 self._record_price_history(deal, deal_data)
                 self.db.commit()
 
+                # Fetch comments if supported by crawler
+                if hasattr(self, 'fetch_deal_comments'):
+                    try:
+                        comments = self.fetch_deal_comments(deal_data['url'])
+                        if comments:
+                            deal.comments = comments
+                            deal.comments_fetched_at = datetime.utcnow()
+                            self.db.commit()
+                            print(f"✅ Fetched {len(comments)} comments for deal {deal.id}")
+                    except Exception as e:
+                        self._log_error(
+                            'CommentFetchError',
+                            str(e),
+                            url=deal_data['url']
+                        )
+
                 self.stats["new_created"] += 1
                 return deal
 

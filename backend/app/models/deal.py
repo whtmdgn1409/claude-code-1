@@ -5,7 +5,7 @@ Core domain models for hot deal aggregation.
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey,
-    Index, UniqueConstraint, CheckConstraint, text
+    Index, UniqueConstraint, CheckConstraint, text, JSON
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -101,6 +101,11 @@ class Deal(Base, TimestampMixin, SoftDeleteMixin):
 
     # AI-generated summary
     ai_summary = Column(Text, nullable=True)  # 3-line summary
+    ai_summary_generated_at = Column(DateTime, nullable=True)  # AI summary generation timestamp
+
+    # Comments data
+    comments = Column(JSON, nullable=True)  # Comment data as JSON array
+    comments_fetched_at = Column(DateTime, nullable=True)  # Comment fetch timestamp
 
     # Classification
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True, index=True)

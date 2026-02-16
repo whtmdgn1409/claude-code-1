@@ -3,6 +3,7 @@ Ppomppu (뽐뿌) crawler implementation.
 Crawls hot deals from www.ppomppu.co.kr
 """
 import re
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -336,6 +337,107 @@ class PpomppuCrawler(BaseCrawler):
                 self._respect_rate_limit()
 
         return all_deals
+
+    def fetch_deal_comments(self, deal_url: str) -> List[Dict]:
+        """
+        Fetch comments from Ppomppu deal detail page.
+
+        Args:
+            deal_url: URL of the deal detail page
+
+        Returns:
+            List of comment dictionaries (max 20, sorted by upvotes)
+            Each comment dict contains: author, content, upvotes, created_at
+
+        Note:
+            This implementation uses generic CSS selectors that may need
+            adjustment based on Ppomppu's actual HTML structure.
+        """
+        try:
+            # Fetch detail page
+            response = self.session.get(deal_url, timeout=10)
+            response.raise_for_status()
+            response.encoding = "euc-kr"  # Ppomppu uses EUC-KR encoding
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            comments = []
+
+            # Try multiple possible selectors for comments
+            # Ppomppu may use different structures for different boards
+            comment_elements = (
+                soup.select(".comment-list .comment-item") or
+                soup.select(".cmt_list tr") or
+                soup.select(".re_list tr") or
+                soup.select("div[id*='comment'] tr")
+            )
+
+            for elem in comment_elements[:20]:  # Limit to 20
+                try:
+                    # Try to extract author
+                    author_el = (
+                        elem.select_one(".comment-author") or
+                        elem.select_one(".writer") or
+                        elem.select_one("td.user") or
+                        elem.select_one("td:first-child")
+                    )
+
+                    # Try to extract content
+                    content_el = (
+                        elem.select_one(".comment-content") or
+                        elem.select_one(".memo_content") or
+                        elem.select_one(".comment_memo") or
+                        elem.select_one("td.memo")
+                    )
+
+                    # Try to extract upvotes
+                    upvote_el = (
+                        elem.select_one(".comment-upvotes") or
+                        elem.select_one(".up") or
+                        elem.select_one(".rec")
+                    )
+
+                    if not (author_el and content_el):
+                        continue
+
+                    author = author_el.get_text(strip=True)
+                    content = content_el.get_text(strip=True)
+
+                    # Skip empty comments
+                    if not content:
+                        continue
+
+                    # Extract upvotes (default 0 if not found)
+                    upvotes = 0
+                    if upvote_el:
+                        upvotes = self._extract_number(upvote_el.get_text())
+
+                    comments.append({
+                        "author": author,
+                        "content": content,
+                        "upvotes": upvotes,
+                        "created_at": datetime.utcnow().isoformat()
+                    })
+
+                except Exception as e:
+                    # Skip individual comment parsing errors
+                    continue
+
+            # Sort by upvotes (descending)
+            comments.sort(key=lambda x: x['upvotes'], reverse=True)
+
+            # Rate limiting - 2 second delay for detail page fetch
+            time.sleep(2.0)
+
+            return comments[:20]
+
+        except Exception as e:
+            self._log_error(
+                'CommentParsingError',
+                str(e),
+                url=deal_url
+            )
+            return []
 
 
 def run_ppomppu_crawler(db, max_pages: int = 5, include_overseas: bool = False):

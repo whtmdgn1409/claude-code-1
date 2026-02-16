@@ -1,24 +1,32 @@
+/**
+ * DealMoa Mobile App
+ * Main entry point
+ */
 import React from 'react';
-import { SafeAreaView, Text, StyleSheet } from 'react-native';
+import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import { AuthProvider } from './src/store/AuthContext';
+import { DealsProvider } from './src/store/DealsContext';
+import AppNavigator from './src/navigation/AppNavigator';
+import { COLORS } from './src/utils/constants';
 
-function App() {
+const App = () => {
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>딜모아</Text>
-      <Text>핫딜 모음 서비스</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+
+      <AuthProvider>
+        <DealsProvider>
+          <AppNavigator />
+        </DealsProvider>
+      </AuthProvider>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    backgroundColor: COLORS.background,
   },
 });
 

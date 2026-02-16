@@ -139,7 +139,8 @@ class NotificationService:
 
         now = datetime.utcnow()
         notification.status = NotificationStatus.CLICKED
-        notification.clicked_at = now
+        if not notification.clicked_at:
+            notification.clicked_at = now
         if not notification.read_at:
             notification.read_at = now
 
