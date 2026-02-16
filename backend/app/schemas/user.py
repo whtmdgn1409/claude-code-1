@@ -4,6 +4,7 @@ Pydantic schemas for User-related API requests and responses.
 from datetime import datetime, time
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, validator
+from app.config import settings
 from app.models.user import AuthProvider, Gender
 
 
@@ -59,7 +60,7 @@ class UserResponse(UserBase):
 class UserRegisterRequest(BaseModel):
     """Schema for email/password registration."""
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=settings.AUTH_PASSWORD_MIN_LENGTH)
     username: Optional[str] = None
     display_name: Optional[str] = None
 

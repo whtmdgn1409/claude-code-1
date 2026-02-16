@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
 
 export default function AuthPanel() {
   const { isAuthenticated, user, isLoading, authError, login, register, logout } = useAuth();
@@ -31,8 +32,8 @@ export default function AuthPanel() {
       return;
     }
 
-    if (password.length < 6) {
-      setMessage('비밀번호는 6자 이상이어야 합니다.');
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setMessage(`비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`);
       return;
     }
 
@@ -95,8 +96,8 @@ export default function AuthPanel() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
-              minLength={6}
-              placeholder="6자 이상"
+              minLength={MIN_PASSWORD_LENGTH}
+              placeholder={`${MIN_PASSWORD_LENGTH}자 이상`}
             />
           </label>
 

@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Database bootstrap
     AUTO_CREATE_SCHEMA: bool = False
 
+    # Authentication
+    AUTH_PASSWORD_MIN_LENGTH: int = 6
+
     # Celery settings
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"

@@ -21,11 +21,48 @@ const buildUrl = (path, params = {}) => {
   return `${API_BASE_URL}${path}${query ? `?${query}` : ''}`;
 };
 
+const normalizeValidationMessage = (value) => {
+  if (typeof value === 'string') {
+    if (/at least/i.test(value) && /characters/i.test(value)) {
+      return `요청 형식이 올바르지 않습니다. (${value})`;
+    }
+    return value;
+  }
+
+  if (!Array.isArray(value)) return null;
+
+  const messages = value
+    .map((item) => {
+      if (typeof item === 'string') {
+        return item;
+      }
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const msg = typeof item.msg === 'string' ? item.msg : '';
+      if (!msg) return null;
+      const isPasswordField = Array.isArray(item.loc) && item.loc.includes('password');
+
+      if (isPasswordField && /at least/i.test(msg) && /characters/i.test(msg)) {
+        return `비밀번호는 ${item.ctx?.min_items || item.ctx?.min_length || item.ctx?.limit_value || 6}자 이상이어야 합니다.`;
+      }
+      return msg;
+    })
+    .filter(Boolean);
+
+  if (!messages.length) return null;
+  return messages.join(', ');
+};
+
 const parseError = async (response) => {
   let detail = `API request failed: ${response.status}`;
   try {
     const body = await response.json();
-    detail = body?.detail || JSON.stringify(body) || detail;
+    if (body?.detail) {
+      detail = normalizeValidationMessage(body.detail) || detail;
+    } else {
+      detail = body ? JSON.stringify(body) : detail;
+    }
   } catch {
     // no-op
   }
