@@ -11,7 +11,7 @@ import {
   relativeTimeFromNow,
 } from '@/lib/format';
 
-const DealCard = ({ deal }) => {
+const DealCard = ({ deal, detailQueryString = '' }) => {
   const { isBookmarked, toggleBookmark, isAuthenticated } = useAuth();
   const [isToggling, setIsToggling] = useState(false);
   const [message, setMessage] = useState('');
@@ -25,6 +25,7 @@ const DealCard = ({ deal }) => {
   };
 
   const isMarked = Boolean(isBookmarked?.(deal.id));
+  const detailHref = detailQueryString ? `/deals/${deal.id}?${detailQueryString}` : `/deals/${deal.id}`;
 
   const onToggleBookmark = async (event) => {
     event.preventDefault();
@@ -49,7 +50,7 @@ const DealCard = ({ deal }) => {
 
   return (
     <article className="deal-card" style={{ contentVisibility: 'auto' }}>
-      <Link href={`/deals/${deal.id}`} className="deal-card-main">
+      <Link href={detailHref} className="deal-card-main">
         <div className="deal-card-top">
           {deal.thumbnail_url ? (
             <Image

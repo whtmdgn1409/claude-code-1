@@ -6,6 +6,23 @@ import { getCategories, getDeals, getSources } from '@/lib/api';
 import { normalizeQuery } from '@/lib/deals';
 
 export const revalidate = 120;
+const THEME_OPTIONS = [
+  { value: 'calm', label: 'calm' },
+  { value: 'bold', label: 'bold' },
+  { value: 'neutral', label: 'neutral' },
+];
+const DEFAULT_THEME = 'calm';
+
+const normalizeThemeValue = (value) => {
+  const normalized = Array.isArray(value) ? value[0] : value;
+  if (normalized === 'coast') return 'calm';
+  if (normalized === 'sunset') return 'bold';
+  if (normalized === 'graphite') return 'neutral';
+  if (THEME_OPTIONS.some((option) => option.value === normalized)) {
+    return normalized;
+  }
+  return DEFAULT_THEME;
+};
 
 export default async function HomePage({ searchParams }) {
   const toFriendlyError = (error) => {
@@ -33,6 +50,7 @@ export default async function HomePage({ searchParams }) {
     source_id: searchParams?.source_id,
     category_id: searchParams?.category_id,
   });
+  const theme = normalizeThemeValue(searchParams?.theme);
 
   const query = {
     ...normalized,
@@ -42,6 +60,7 @@ export default async function HomePage({ searchParams }) {
     source_id: normalized.source_id,
     category_id: normalized.category_id,
     page: normalized.page,
+    theme,
   };
 
   let safeDeals = [];
@@ -76,6 +95,18 @@ export default async function HomePage({ searchParams }) {
   const searchHint = query.q && query.q.length > 0 && query.q.length < 2
     ? '검색어는 2자 이상으로 입력하세요. 현재는 전체 목록으로 전환됩니다.'
     : '';
+  const activeFilterCount = [
+    searchParams?.q,
+    searchParams?.source_id,
+    searchParams?.category_id,
+    searchParams?.sort_by,
+    searchParams?.order,
+  ].filter(Boolean).length;
+  const heroFacts = [
+    { label: '현재 노출', value: `${safeDeals.length}건` },
+    { label: '페이지', value: `${query.page} / ${safeTotalPages}` },
+    { label: '활성 필터', value: `${activeFilterCount}개` },
+  ];
 
   const buildPageUrl = (page) => {
     const nextSearchParams = new URLSearchParams();
@@ -86,17 +117,56 @@ export default async function HomePage({ searchParams }) {
     nextSearchParams.set('source_id', query.source_id || '');
     nextSearchParams.set('category_id', query.category_id || '');
     nextSearchParams.set('page', String(page));
+    nextSearchParams.set('theme', query.theme || DEFAULT_THEME);
+
+    return `/?${nextSearchParams.toString()}`;
+  };
+
+  const buildThemeUrl = (nextTheme) => {
+    const nextSearchParams = new URLSearchParams();
+
+    nextSearchParams.set('q', query.q || '');
+    nextSearchParams.set('sort_by', query.sort_by || '');
+    nextSearchParams.set('order', query.order || 'desc');
+    nextSearchParams.set('source_id', query.source_id || '');
+    nextSearchParams.set('category_id', query.category_id || '');
+    nextSearchParams.set('page', String(query.page));
+    nextSearchParams.set('theme', nextTheme);
 
     return `/?${nextSearchParams.toString()}`;
   };
 
   return (
-    <main>
-      <header className="board-header">
+    <main className={`page-shell theme-${theme}`}>
+      <header className="board-header hero-shell">
+        <nav className="theme-switcher top-theme-bar" aria-label="보드 컬러 테마">
+          {THEME_OPTIONS.map((option) => (
+            <Link
+              key={option.value}
+              href={buildThemeUrl(option.value)}
+              className={`theme-pill ${theme === option.value ? 'active' : ''}`}
+            >
+              {option.label}
+            </Link>
+          ))}
+        </nav>
+        <p className="board-kicker">DEALMOA CURATION</p>
         <h1 className="board-title">딜모아 게시판</h1>
         <p className="board-subtitle">기존 API를 기반으로 구축한 실시간 핫딜 보드</p>
-        <BoardFilters query={query} sources={sources} categories={categories} />
-        <AuthPanel />
+        <dl className="hero-facts" aria-label="보드 상태">
+          {heroFacts.map((fact) => (
+            <div key={fact.label}>
+              <dt>{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="panel-surface">
+          <BoardFilters query={query} sources={sources} categories={categories} />
+        </div>
+        <div className="panel-surface auth-surface">
+          <AuthPanel />
+        </div>
       </header>
       <noscript>
         <nav className="board-pagination">
@@ -120,7 +190,7 @@ export default async function HomePage({ searchParams }) {
       <BoardFeed
         initialDeals={safeDeals}
         totalPages={safeTotalPages}
-        query={{ ...query, q: query.q, page_size: query.page_size }}
+        query={{ ...query, q: query.q, page_size: query.page_size, theme }}
         initialPage={query.page}
       />
     </main>

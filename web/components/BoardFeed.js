@@ -29,6 +29,23 @@ export default function BoardFeed({ initialDeals, totalPages, query, initialPage
     return Math.max(1, Number(totalPages || 1));
   }, [totalPages]);
 
+  const detailQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    const append = (key, value) => {
+      if (value === undefined || value === null || value === '') return;
+      params.set(key, String(value));
+    };
+
+    append('q', query?.q || '');
+    append('sort_by', query?.sort_by || '');
+    append('order', query?.order || '');
+    append('source_id', query?.source_id || '');
+    append('category_id', query?.category_id || '');
+    append('theme', query?.theme || '');
+    append('page', currentPage);
+    return params.toString();
+  }, [currentPage, query]);
+
   const appendDeals = useCallback((items = []) => {
     if (!items.length) return;
     setDeals((prev) => {
@@ -105,7 +122,7 @@ export default function BoardFeed({ initialDeals, totalPages, query, initialPage
     <>
       <section className="board-grid">
         {deals.map((deal) => (
-          <DealCard key={deal.id} deal={deal} />
+          <DealCard key={deal.id} deal={deal} detailQueryString={detailQueryString} />
         ))}
       </section>
 

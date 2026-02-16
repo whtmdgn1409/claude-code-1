@@ -28,6 +28,7 @@ const BoardFilters = ({ query, sources, categories }) => {
 
   return (
     <form method="get" className="filter-wrap">
+      {query.theme ? <input type="hidden" name="theme" value={query.theme} /> : null}
       <input
         name="q"
         placeholder="딜 제목/상품명 검색 (2자 이상)"
